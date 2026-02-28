@@ -122,58 +122,65 @@ export function SearchPageClient({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // When panel opens with empty chat, kick off the AI conversation
-  const panelInitRef = useRef(false);
-  useEffect(() => {
-    if (panelOpen && chatMessages.length === 0 && !panelInitRef.current) {
-      panelInitRef.current = true;
-      (async () => {
-        setChatLoading(true);
-        try {
-          const context = {
-            currentFilters: {
-              districts: currentDistricts,
-              types: currentTypes,
-              minRent: params.minRent ? Number(params.minRent) : undefined,
-              maxRent: params.maxRent ? Number(params.maxRent) : undefined,
-              minArea: params.minArea ? Number(params.minArea) : undefined,
-              maxArea: params.maxArea ? Number(params.maxArea) : undefined,
-            },
-            resultCount: total,
-            propertySummaries: properties.slice(0, 10).map((p) => ({
-              id: p.id, title: p.title, district: p.district,
-              propertyType: p.propertyType, monthlyRent: p.monthlyRent,
-              saleableArea: p.saleableArea, floor: p.floor,
-            })),
-          };
-          const openingMsg = total > 0
-            ? `The user just opened the chat. There are ${total} properties currently in the results. Greet them and ask what type of space they're looking for.`
-            : "The user just opened the chat with no search filters set. Greet them and ask what type of space they're looking for.";
-          const res = await fetch("/api/ai/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: [{ role: "user", content: openingMsg }], context }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setChatMessages([{ role: "assistant", content: data.message }]);
-            if (data.suggestedChips?.length) setSuggestedChips(data.suggestedChips);
-          } else {
-            setChatMessages([{ role: "assistant", content: "Hey! What type of commercial space are you looking for?" }]);
-            setSuggestedChips(["Office", "Retail / Shop", "F&B / Restaurant", "Warehouse"]);
-          }
-        } catch {
-          setChatMessages([{ role: "assistant", content: "Hey! What type of commercial space are you looking for?" }]);
-          setSuggestedChips(["Office", "Retail / Shop", "F&B / Restaurant", "Warehouse"]);
-        } finally {
-          setChatLoading(false);
-        }
-      })();
+  const [filtersSentToAi, setFiltersSentToAi] = useState(false);
+
+  async function handleSendToAi() {
+    const parts: string[] = [];
+    if (types.length) parts.push(`Property types: ${types.join(", ")}`);
+    if (location) parts.push(`District: ${location}`);
+    if (minPrice || maxPrice) parts.push(`Rent: HK$${minPrice || "0"} – ${maxPrice || "any"}/mo`);
+    if (minArea || maxArea) parts.push(`Area: ${minArea || "0"} – ${maxArea || "any"} sqft`);
+    if (listingType) parts.push(`Listing type: ${listingType}`);
+    if (duration) parts.push(`Lease duration: ${duration}`);
+    if (fengShuiRated) parts.push("Feng Shui rated only");
+    if (minFengShui) parts.push(`Min Feng Shui score: ${minFengShui}`);
+
+    const filterSummary = parts.length
+      ? parts.join("\n")
+      : "No specific filters selected yet.";
+
+    setFiltersSentToAi(true);
+    setChatLoading(true);
+
+    try {
+      const context = {
+        currentFilters: {
+          districts: location ? [location] : [],
+          types,
+          minRent: minPrice ? Number(minPrice) : undefined,
+          maxRent: maxPrice ? Number(maxPrice) : undefined,
+          minArea: minArea ? Number(minArea) : undefined,
+          maxArea: maxArea ? Number(maxArea) : undefined,
+        },
+        resultCount: total,
+        propertySummaries: properties.slice(0, 10).map((p) => ({
+          id: p.id, title: p.title, district: p.district,
+          propertyType: p.propertyType, monthlyRent: p.monthlyRent,
+          saleableArea: p.saleableArea, floor: p.floor,
+        })),
+      };
+
+      const openingMsg = `The user has selected these filters:\n${filterSummary}\n\nBased on these preferences, greet them briefly and ask 1-2 clarifying questions to help refine the search.`;
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: openingMsg }], context }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages([{ role: "assistant", content: data.message }]);
+        if (data.suggestedChips?.length) setSuggestedChips(data.suggestedChips);
+      } else {
+        setChatMessages([{ role: "assistant", content: `Got it! I see you're looking for${types.length ? ` ${types.join("/")}` : ""} space${location ? ` in ${location}` : ""}. Any specific requirements I should know about?` }]);
+      }
+    } catch {
+      setChatMessages([{ role: "assistant", content: "I received your filters. What else can you tell me about your ideal space?" }]);
+    } finally {
+      setChatLoading(false);
     }
-    if (!panelOpen) {
-      panelInitRef.current = false;
-    }
-  }, [panelOpen]);
+  }
 
 
   const activeFilterCount =
@@ -606,17 +613,31 @@ export function SearchPageClient({
             className="absolute left-0 top-0 bottom-0 w-[min(720px,95vw)] bg-white shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 flex-shrink-0">
-              <h2 className="flex items-center gap-2 text-lg font-bold text-black">
-                <SlidersHorizontal className="h-5 w-5" />
-                Filters
-                <span className="text-gray-300">|</span>
-                <MessageSquare className="h-5 w-5 text-primary" />
-                AI Advisor
-              </h2>
-              <button onClick={() => setPanelOpen(false)} className="rounded-full p-1 hover:bg-gray-100 transition-colors">
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+            <div className="flex flex-col border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center justify-between px-5 py-4">
+                <h2 className="flex items-center gap-2 text-lg font-bold text-black">
+                  <SlidersHorizontal className="h-5 w-5" />
+                  Filters
+                  <span className="text-gray-300">|</span>
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  AI Advisor
+                </h2>
+                <button onClick={() => setPanelOpen(false)} className="rounded-full p-1 hover:bg-gray-100 transition-colors">
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              {filtersSentToAi && (
+                <div className="px-5 pb-3">
+                  <button
+                    type="button"
+                    onClick={applyFilters}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    Search for Property Listings
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
@@ -761,15 +782,16 @@ export function SearchPageClient({
               </div>
                 </div>
 
-                {/* Apply */}
+                {/* Send to AI */}
                 <div className="border-t border-gray-200 bg-white px-5 py-4 flex gap-2 flex-shrink-0">
                   <button type="button" onClick={clearFilters}
                     className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
                     Clear
                   </button>
-                  <button type="button" onClick={applyFilters}
-                    className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
-                    Apply Filters
+                  <button type="button" onClick={handleSendToAi} disabled={chatLoading}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50">
+                    {chatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Send to AI
                   </button>
                 </div>
               </div>
@@ -784,7 +806,9 @@ export function SearchPageClient({
                   </div>
                   <h4 className="mt-4 text-sm font-semibold text-black">AI Property Advisor</h4>
                   <p className="mt-1 max-w-[260px] text-xs text-gray-400">
-                    I&apos;ll ask a few quick questions to find the right properties for you.
+                    {filtersSentToAi
+                      ? "Starting AI advisor..."
+                      : "Select your filters on the left, then click \"Send to AI\" to get personalised recommendations."}
                   </p>
                 </div>
               )}
