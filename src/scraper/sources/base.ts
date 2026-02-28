@@ -168,12 +168,6 @@ export abstract class BaseScraper {
         parsed.searchParams.delete("size");
       }
 
-      // Known thumbnail markers in paths.
-      parsed.pathname = parsed.pathname
-        .replace(/\/thumb\//gi, "/")
-        .replace(/\/thumbnail\//gi, "/")
-        .replace(/([_-])(thumb|thumbnail)(?=[._-])/gi, "$1");
-
       // Unsplash seeded images often carry width constraints in query params.
       if (host.includes("images.unsplash.com")) {
         parsed.searchParams.delete("w");

@@ -16,7 +16,6 @@ import {
   Sparkles,
   Shield,
   HelpCircle,
-  CircleDot,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,12 +30,14 @@ import { ContactDialog } from "@/components/property/contact-dialog";
 import { ScheduleViewing } from "@/components/property/schedule-viewing";
 import { LocationMap } from "@/components/property/location-map";
 import { SimilarProperties } from "@/components/property/similar-properties";
+import { FengShuiPreference } from "@/components/property/feng-shui-preference";
 import { OverviewTab } from "@/components/property/overview-tab";
 import { CostsTab } from "@/components/property/costs-tab";
 import { AISummaryTab } from "@/components/property/ai-summary-tab";
 import { SourcesTab } from "@/components/property/sources-tab";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatArea, formatPsf } from "@/lib/utils";
+import type { EvidencePackData, RiskCheckData } from "@/types";
 
 const typeLabels: Record<string, string> = {
   retail: "Retail",
@@ -81,6 +82,115 @@ async function getProperty(id: string) {
   } catch {
     return null;
   }
+}
+
+function buildEvidenceFallback(
+  property: NonNullable<Awaited<ReturnType<typeof getProperty>>>,
+): EvidencePackData {
+  const latestSource = property.sourceListings
+    .slice()
+    .sort((a, b) => b.scrapedAt.getTime() - a.scrapedAt.getTime())[0];
+  const sourceUrl = latestSource?.sourceUrl ?? null;
+
+  const ownershipStatus = sourceUrl ? "verified" : "pending";
+  const floorPlanStatus = property.floorPlanUrl ? "verified" : "pending";
+  const buildingRecordStatus =
+    property.buildingName || property.address ? "pending" : "unconfirmed";
+  const tenancyStatus = property.status === "active" ? "verified" : "pending";
+  const ubwStatus = property.hasFSD || property.hasExhaust ? "pending" : "unconfirmed";
+
+  const scoreMap: Record<string, number> = { verified: 100, pending: 60, unconfirmed: 20 };
+  const completionPct = Math.round(
+    (scoreMap[ownershipStatus] +
+      scoreMap[floorPlanStatus] +
+      scoreMap[buildingRecordStatus] +
+      scoreMap[tenancyStatus] +
+      scoreMap[ubwStatus]) /
+      5,
+  );
+
+  return {
+    id: `fallback-${property.id}`,
+    ownershipStatus,
+    ownershipSource: sourceUrl,
+    ownershipDate: latestSource?.scrapedAt ?? null,
+    floorPlanStatus,
+    floorPlanSource: property.floorPlanUrl ?? sourceUrl,
+    buildingRecordStatus,
+    buildingRecordSource: sourceUrl,
+    tenancyStatus,
+    tenancyDetail:
+      property.status === "active"
+        ? "Listing is currently active on source portals."
+        : "Tenancy confirmation pending from source.",
+    ubwStatus,
+    ubwDetail: property.hasFSD
+      ? "FSD data present in listing metadata."
+      : "No direct UBW confirmation in source metadata.",
+    completionPct,
+  };
+}
+
+function buildRiskFallback(
+  property: NonNullable<Awaited<ReturnType<typeof getProperty>>>,
+): RiskCheckData[] {
+  const sourceRefs = property.sourceListings
+    .map((s) => s.sourceUrl)
+    .filter((u): u is string => !!u)
+    .slice(0, 2);
+  const sectorType = property.propertyType || "office";
+
+  const checks: RiskCheckData[] = [];
+  const addCheck = (
+    checkName: string,
+    status: "pass" | "fail" | "risk" | "unknown",
+    explanation: string,
+    recommendation: string,
+    confidence = 0.65,
+  ) => {
+    checks.push({
+      id: `fallback-${property.id}-${checkName}`,
+      sectorType,
+      checkName,
+      status,
+      confidence,
+      explanation,
+      recommendation,
+      sources: sourceRefs,
+    });
+  };
+
+  addCheck(
+    "fire_safety",
+    property.hasFSD ? "pass" : "unknown",
+    property.hasFSD
+      ? "Listing indicates fire safety documentation signals."
+      : "No explicit fire safety signals were found in current listing data.",
+    "Request latest FSD/BD compliance documents before lease execution.",
+    property.hasFSD ? 0.8 : 0.55,
+  );
+
+  addCheck(
+    "ventilation_exhaust",
+    property.propertyType === "fnb" && !property.hasExhaust ? "fail" : property.hasExhaust ? "pass" : "unknown",
+    property.hasExhaust
+      ? "Exhaust system is present based on listing metadata."
+      : "Exhaust system status is missing or negative in listing metadata.",
+    "Confirm duct route feasibility and budget for installation if needed.",
+    property.hasExhaust ? 0.8 : 0.6,
+  );
+
+  addCheck(
+    "loading_bay",
+    property.loadingAccess ? "pass" : "risk",
+    property.loadingAccess
+      ? "Loading access is mentioned in listing metadata."
+      : "No dedicated loading access is indicated in listing metadata.",
+    "Verify goods handling route and operating hours with management office.",
+    property.loadingAccess ? 0.75 : 0.65,
+  );
+
+  return checks;
 }
 
 function generateAISummary(property: NonNullable<Awaited<ReturnType<typeof getProperty>>>) {
@@ -144,6 +254,9 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
     : [placeholders[property.propertyType] || placeholders.office];
   const regulatoryNotes = (property.regulatoryNotes as RegulatoryItem[] | null) ?? [];
   const aiSummary = generateAISummary(property);
+  const effectiveEvidencePack = property.evidencePack ?? buildEvidenceFallback(property);
+  const effectiveRiskChecks =
+    property.riskChecks.length > 0 ? property.riskChecks : buildRiskFallback(property);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -325,32 +438,15 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
             {/* ── Evidence Tab ── */}
             <TabsContent value="evidence">
-              {property.evidencePack ? (
-                <EvidencePack data={property.evidencePack} />
-              ) : (
-                <Card className="bg-white">
-                  <CardContent className="py-10 text-center text-muted-foreground">
-                    Evidence pack is being compiled for this property.
-                  </CardContent>
-                </Card>
-              )}
+              <EvidencePack data={effectiveEvidencePack} />
             </TabsContent>
 
             {/* ── Risk Tab ── */}
             <TabsContent value="risk">
-              {property.riskChecks.length > 0 ? (
-                <RiskAssessment
-                  checks={property.riskChecks}
-                  sectorType={property.riskChecks[0].sectorType}
-                />
-              ) : (
-                <Card className="bg-white">
-                  <CardContent className="py-10 text-center text-muted-foreground">
-                    Complete your profile to see fit-for-use risk assessments
-                    tailored to your business type.
-                  </CardContent>
-                </Card>
-              )}
+              <RiskAssessment
+                checks={effectiveRiskChecks}
+                sectorType={effectiveRiskChecks[0]?.sectorType || property.propertyType}
+              />
             </TabsContent>
 
             {/* ── Sources Tab ── */}
@@ -360,11 +456,48 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                   ...src,
                   rawData: src.rawData as Record<string, unknown>,
                 }))}
-                monthlyRent={property.monthlyRent}
+                monthlyRent={property.monthlyRent ?? property.price}
                 title={property.title}
               />
             </TabsContent>
           </Tabs>
+
+          {/* Compliance Quick Check */}
+          {regulatoryNotes.length > 0 && (
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Compliance Quick Check
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {regulatoryNotes.map((item, i) => (
+                    <div key={i} className="flex items-start gap-2.5 text-sm">
+                      <RegulatoryStatusIcon status={item.status} />
+                      <div className="min-w-0">
+                        <p className="font-medium">{item.label}</p>
+                        {item.note && (
+                          <p className="text-xs text-muted-foreground">{item.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Feng Shui Analysis */}
+          <FengShuiPreference
+            propertyType={property.propertyType}
+            district={property.district}
+            currentScore={property.fengShuiScore}
+            currentNotes={property.fengShuiNotes}
+            floor={property.floor}
+            address={property.address}
+          />
 
           {/* Location Map */}
           {property.latitude != null && property.longitude != null && (
@@ -481,58 +614,6 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             </CardContent>
           </Card>
 
-          {/* Feng Shui Card */}
-          {property.fengShuiScore != null && (
-            <Card className="bg-white">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CircleDot className="h-5 w-5 text-primary" />
-                  Feng Shui
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Score</span>
-                    <span className="font-bold">{property.fengShuiScore}/100</span>
-                  </div>
-                  <FengShuiMeter score={property.fengShuiScore} />
-                </div>
-                {property.fengShuiNotes && (
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {property.fengShuiNotes}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Regulatory Checklist Card */}
-          {regulatoryNotes.length > 0 && (
-            <Card className="bg-white">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Shield className="h-5 w-5 text-primary" />
-                  Regulatory Checklist
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {regulatoryNotes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2.5 text-sm">
-                      <RegulatoryStatusIcon status={item.status} />
-                      <div className="min-w-0">
-                        <p className="font-medium">{item.label}</p>
-                        {item.note && (
-                          <p className="text-xs text-muted-foreground">{item.note}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </div>
@@ -586,26 +667,6 @@ function AiScoreCircle({ score, size = "md" }: { score: number; size?: "sm" | "m
       >
         {score}
       </span>
-    </div>
-  );
-}
-
-function FengShuiMeter({ score }: { score: number }) {
-  const color =
-    score >= 80
-      ? "bg-emerald-500"
-      : score >= 60
-        ? "bg-blue-500"
-        : score >= 40
-          ? "bg-amber-500"
-          : "bg-red-500";
-
-  return (
-    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-      <div
-        className={`h-full rounded-full transition-all duration-500 ${color}`}
-        style={{ width: `${score}%` }}
-      />
     </div>
   );
 }

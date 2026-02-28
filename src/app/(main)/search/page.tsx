@@ -14,6 +14,8 @@ interface SearchPageProps {
     maxRent?: string;
     minArea?: string;
     maxArea?: string;
+    fengShuiRated?: string;
+    minFengShui?: string;
     sort?: string;
     page?: string;
     mode?: string;
@@ -58,6 +60,13 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
         ],
       },
     ];
+  }
+
+  if (params.fengShuiRated === "1" || params.minFengShui) {
+    const fengShuiFilter: Prisma.IntNullableFilter = {};
+    if (params.fengShuiRated === "1") fengShuiFilter.not = null;
+    if (params.minFengShui) fengShuiFilter.gte = Number(params.minFengShui);
+    where.fengShuiScore = fengShuiFilter;
   }
 
   if (params.q) {
@@ -158,7 +167,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   const hasAnyFilter = !!(
     params.districts || params.types || params.minRent || params.maxRent ||
-    params.minArea || params.maxArea || params.q
+    params.minArea || params.maxArea || params.q || params.fengShuiRated || params.minFengShui
   );
 
   const { properties, total, page, limit } = await searchProperties(params);
