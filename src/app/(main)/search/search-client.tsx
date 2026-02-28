@@ -88,8 +88,7 @@ export function SearchPageClient({
   hasAnyFilter,
 }: SearchPageClientProps) {
   const router = useRouter();
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [whatIfExpanded, setWhatIfExpanded] = useState(false);
 
   // Filter state
@@ -112,6 +111,7 @@ export function SearchPageClient({
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [lastQuery, setLastQuery] = useState("");
+  const [suggestedChips, setSuggestedChips] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Search bar
@@ -121,6 +121,59 @@ export function SearchPageClient({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
+
+  // When panel opens with empty chat, kick off the AI conversation
+  const panelInitRef = useRef(false);
+  useEffect(() => {
+    if (panelOpen && chatMessages.length === 0 && !panelInitRef.current) {
+      panelInitRef.current = true;
+      (async () => {
+        setChatLoading(true);
+        try {
+          const context = {
+            currentFilters: {
+              districts: currentDistricts,
+              types: currentTypes,
+              minRent: params.minRent ? Number(params.minRent) : undefined,
+              maxRent: params.maxRent ? Number(params.maxRent) : undefined,
+              minArea: params.minArea ? Number(params.minArea) : undefined,
+              maxArea: params.maxArea ? Number(params.maxArea) : undefined,
+            },
+            resultCount: total,
+            propertySummaries: properties.slice(0, 10).map((p) => ({
+              id: p.id, title: p.title, district: p.district,
+              propertyType: p.propertyType, monthlyRent: p.monthlyRent,
+              saleableArea: p.saleableArea, floor: p.floor,
+            })),
+          };
+          const openingMsg = total > 0
+            ? `The user just opened the chat. There are ${total} properties currently in the results. Greet them and ask what type of space they're looking for.`
+            : "The user just opened the chat with no search filters set. Greet them and ask what type of space they're looking for.";
+          const res = await fetch("/api/ai/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: [{ role: "user", content: openingMsg }], context }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setChatMessages([{ role: "assistant", content: data.message }]);
+            if (data.suggestedChips?.length) setSuggestedChips(data.suggestedChips);
+          } else {
+            setChatMessages([{ role: "assistant", content: "Hey! What type of commercial space are you looking for?" }]);
+            setSuggestedChips(["Office", "Retail / Shop", "F&B / Restaurant", "Warehouse"]);
+          }
+        } catch {
+          setChatMessages([{ role: "assistant", content: "Hey! What type of commercial space are you looking for?" }]);
+          setSuggestedChips(["Office", "Retail / Shop", "F&B / Restaurant", "Warehouse"]);
+        } finally {
+          setChatLoading(false);
+        }
+      })();
+    }
+    if (!panelOpen) {
+      panelInitRef.current = false;
+    }
+  }, [panelOpen]);
 
 
   const activeFilterCount =
@@ -144,7 +197,7 @@ export function SearchPageClient({
     if (params.sort) p.set("sort", params.sort);
     if (params.q) p.set("q", params.q);
     router.push(`/search?${p.toString()}`);
-    setFilterOpen(false);
+    setPanelOpen(false);
   }
 
   function clearFilters() {
@@ -159,7 +212,7 @@ export function SearchPageClient({
     setLocation("");
     setDuration("");
     router.push("/search");
-    setFilterOpen(false);
+    setPanelOpen(false);
   }
 
   function handleQuickSearch(q: { districts: string; types: string }) {
@@ -167,7 +220,7 @@ export function SearchPageClient({
     if (q.districts) p.set("districts", q.districts);
     if (q.types) p.set("types", q.types);
     router.push(`/search?${p.toString()}`);
-    setFilterOpen(false);
+    setPanelOpen(false);
   }
 
   async function handleSearchSubmit(e: React.FormEvent) {
@@ -205,39 +258,61 @@ export function SearchPageClient({
     if (!chatInput.trim() || chatLoading) return;
     const msg = chatInput.trim();
     setChatInput("");
-    setChatMessages((prev) => [...prev, { role: "user", content: msg }]);
+    setSuggestedChips([]);
+
+    const updatedMessages: { role: "user" | "assistant"; content: string }[] = [
+      ...chatMessages,
+      { role: "user" as const, content: msg },
+    ];
+    setChatMessages(updatedMessages);
     setChatLoading(true);
-    setLastQuery(msg);
+
     try {
-      const res = await fetch("/api/ai/parse-query", {
+      const context = {
+        currentFilters: {
+          districts: currentDistricts,
+          types: currentTypes,
+          minRent: params.minRent ? Number(params.minRent) : undefined,
+          maxRent: params.maxRent ? Number(params.maxRent) : undefined,
+          minArea: params.minArea ? Number(params.minArea) : undefined,
+          maxArea: params.maxArea ? Number(params.maxArea) : undefined,
+        },
+        resultCount: total,
+        propertySummaries: properties.slice(0, 10).map((p) => ({
+          id: p.id, title: p.title, district: p.district,
+          propertyType: p.propertyType, monthlyRent: p.monthlyRent,
+          saleableArea: p.saleableArea, floor: p.floor,
+        })),
+      };
+
+      const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: msg }),
+        body: JSON.stringify({ messages: updatedMessages, context }),
       });
+
       if (res.ok) {
-        const parsed = await res.json();
-        const hasFilters = parsed.filters?.districts?.length || parsed.filters?.propertyTypes?.length || parsed.filters?.minRent || parsed.filters?.maxRent;
-        if (hasFilters) {
-          const parts: string[] = ["Here's what I found:"];
-          if (parsed.filters?.districts?.length) parts.push(`Districts: ${parsed.filters.districts.join(", ")}`);
-          if (parsed.filters?.propertyTypes?.length) parts.push(`Types: ${parsed.filters.propertyTypes.join(", ")}`);
-          if (parsed.filters?.minRent || parsed.filters?.maxRent) parts.push(`Budget: HK$${parsed.filters.minRent?.toLocaleString() || "0"} – ${parsed.filters.maxRent?.toLocaleString() || "any"}/mo`);
-          parts.push("\nTap Search to view results.");
+        const data = await res.json();
+        setChatMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+        if (data.suggestedChips?.length) setSuggestedChips(data.suggestedChips);
+
+        if (data.filters) {
           const sp = new URLSearchParams();
-          if (parsed.filters?.districts?.length) sp.set("districts", parsed.filters.districts.join(","));
-          if (parsed.filters?.propertyTypes?.length) sp.set("types", parsed.filters.propertyTypes.join(","));
-          if (parsed.filters?.minRent) sp.set("minRent", String(parsed.filters.minRent));
-          if (parsed.filters?.maxRent) sp.set("maxRent", String(parsed.filters.maxRent));
+          if (data.filters.districts?.length) sp.set("districts", data.filters.districts.join(","));
+          if (data.filters.propertyTypes?.length) sp.set("types", data.filters.propertyTypes.join(","));
+          if (data.filters.minRent) sp.set("minRent", String(data.filters.minRent));
+          if (data.filters.maxRent) sp.set("maxRent", String(data.filters.maxRent));
+          if (data.filters.minArea) sp.set("minArea", String(data.filters.minArea));
+          if (data.filters.maxArea) sp.set("maxArea", String(data.filters.maxArea));
           setLastQuery(sp.toString());
-          setChatMessages((prev) => [...prev, { role: "assistant", content: parts.join("\n") }]);
-        } else {
-          setChatMessages((prev) => [...prev, { role: "assistant", content: "Be more specific — include a district, type, or budget. e.g. \"500 sqft office in Wan Chai under 30K\"" }]);
         }
       } else {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: "Couldn't parse that — try again." }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: "Something went wrong — could you try again?" }]);
+        setSuggestedChips(["Office", "Retail", "F&B", "Warehouse"]);
       }
     } catch {
       setChatMessages((prev) => [...prev, { role: "assistant", content: "Connection issue. Try again." }]);
+      setSuggestedChips(["Office", "Retail", "F&B", "Warehouse"]);
     } finally {
       setChatLoading(false);
     }
@@ -249,7 +324,7 @@ export function SearchPageClient({
     } else if (lastQuery) {
       router.push(`/search?q=${encodeURIComponent(lastQuery)}`);
     }
-    setAiOpen(false);
+    setPanelOpen(false);
   }
 
   function applyFengShuiFromDropdown(rated: boolean, minScore: string) {
@@ -280,13 +355,15 @@ export function SearchPageClient({
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex items-center gap-3 py-3">
-            {/* Filter Button */}
+            {/* Filters & AI Panel Button */}
             <button
-              onClick={() => { setFilterOpen(true); setAiOpen(false); }}
+              onClick={() => setPanelOpen(true)}
               className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex-shrink-0"
             >
               <SlidersHorizontal className="h-4 w-4" />
               <span className="hidden sm:inline">Filters</span>
+              <MessageSquare className="h-4 w-4 text-primary" />
+              <span className="hidden sm:inline text-primary">AI</span>
               {activeFilterCount > 0 && (
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                   {activeFilterCount}
@@ -457,7 +534,7 @@ export function SearchPageClient({
               Clear Filters
             </Link>
             <button
-              onClick={() => setAiOpen(true)}
+              onClick={() => setPanelOpen(true)}
               className="rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Ask AI Advisor
@@ -529,22 +606,31 @@ export function SearchPageClient({
         </div>
       )}
 
-      {/* ─── Filter Drawer (slide from left) ─── */}
-      {filterOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)}>
+      {/* ─── Filters & AI Panel (slide from left) ─── */}
+      {panelOpen && (
+        <div className="fixed inset-0 z-50" onClick={() => setPanelOpen(false)}>
           <div className="absolute inset-0 bg-black/30 animate-in fade-in duration-200" />
           <div
-            className="absolute left-0 top-0 bottom-0 w-[340px] max-w-[85vw] bg-white shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col"
+            className="absolute left-0 top-0 bottom-0 w-[min(720px,95vw)] bg-white shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h2 className="text-lg font-bold text-black">Filters</h2>
-              <button onClick={() => setFilterOpen(false)} className="rounded-full p-1 hover:bg-gray-100 transition-colors">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 flex-shrink-0">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-black">
+                <SlidersHorizontal className="h-5 w-5" />
+                Filters
+                <span className="text-gray-300">|</span>
+                <MessageSquare className="h-5 w-5 text-primary" />
+                AI Advisor
+              </h2>
+              <button onClick={() => setPanelOpen(false)} className="rounded-full p-1 hover:bg-gray-100 transition-colors">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
+              {/* Left: Filters */}
+              <div className="w-full sm:w-[340px] flex-shrink-0 border-b sm:border-b-0 sm:border-r border-gray-200 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
               {/* Quick Searches */}
               <div>
                 <label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -681,63 +767,33 @@ export function SearchPageClient({
                   ))}
                 </div>
               </div>
-            </div>
+                </div>
 
-            {/* Apply */}
-            <div className="border-t border-gray-200 bg-white px-5 py-4 flex gap-2">
-              <button type="button" onClick={clearFilters}
-                className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
-                Clear
-              </button>
-              <button type="button" onClick={applyFilters}
-                className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                {/* Apply */}
+                <div className="border-t border-gray-200 bg-white px-5 py-4 flex gap-2 flex-shrink-0">
+                  <button type="button" onClick={clearFilters}
+                    className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+                    Clear
+                  </button>
+                  <button type="button" onClick={applyFilters}
+                    className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
 
-      {/* ─── AI Advisor Drawer (slide from right) ─── */}
-      {aiOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setAiOpen(false)}>
-          <div className="absolute inset-0 bg-black/30 animate-in fade-in duration-200" />
-          <div
-            className="absolute right-0 top-0 bottom-0 w-[380px] max-w-[90vw] bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h2 className="flex items-center gap-2 text-lg font-bold text-black">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Advisor
-              </h2>
-              <button onClick={() => setAiOpen(false)} className="rounded-full p-1 hover:bg-gray-100 transition-colors">
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {/* Right: AI Advisor */}
+              <div className="flex-1 flex flex-col min-w-0 min-h-[280px] bg-gray-50/50">
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-0">
               {chatMessages.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex flex-col items-center justify-center py-8 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                     <MessageSquare className="h-6 w-6 text-primary" />
                   </div>
-                  <h4 className="mt-4 text-sm font-semibold text-black">Ask about HK commercial property</h4>
-                  <p className="mt-1 max-w-[280px] text-xs text-gray-400">
-                    Describe what you need in plain English and I&apos;ll find matching properties.
+                  <h4 className="mt-4 text-sm font-semibold text-black">AI Property Advisor</h4>
+                  <p className="mt-1 max-w-[260px] text-xs text-gray-400">
+                    I&apos;ll ask a few quick questions to find the right properties for you.
                   </p>
-                  <div className="mt-5 flex flex-col gap-2 w-full">
-                    {[
-                      "500 sqft office in Central under 30K",
-                      "Restaurant space in Causeway Bay with exhaust",
-                      "Warehouse near Kwai Chung container port",
-                    ].map((example) => (
-                      <button key={example} onClick={() => setChatInput(example)}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 text-left transition-colors hover:border-primary hover:text-primary">
-                        &quot;{example}&quot;
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )}
 
@@ -747,32 +803,44 @@ export function SearchPageClient({
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 </div>
               ))}
+              {suggestedChips.length > 0 && !chatLoading && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {suggestedChips.map((chip) => (
+                    <button key={chip} onClick={() => setChatInput(chip)}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-primary hover:text-primary transition-colors">
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
               {chatLoading && (
                 <div className="flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-400 max-w-[85%]">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Parsing...
                 </div>
               )}
-              <div ref={chatEndRef} />
-            </div>
+                  <div ref={chatEndRef} />
+                </div>
 
-            <div className="border-t border-gray-200 bg-white px-5 py-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
-                  placeholder="Describe what you need..."
-                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-black placeholder:text-gray-400 focus:border-gray-400 focus:outline-none" />
-                <button type="button" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-800 disabled:opacity-40">
-                  <Send className="h-4 w-4" />
-                </button>
+                <div className="border-t border-gray-200 bg-white px-5 py-4 space-y-3 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
+                      placeholder="Describe what you need..."
+                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-black placeholder:text-gray-400 focus:border-gray-400 focus:outline-none" />
+                    <button type="button" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-800 disabled:opacity-40">
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {lastQuery && (
+                    <button type="button" onClick={handleChatSearch}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
+                      <Search className="h-4 w-4" /> Search Properties
+                    </button>
+                  )}
+                </div>
               </div>
-              {chatMessages.length > 0 && (
-                <button type="button" onClick={handleChatSearch}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
-                  <Search className="h-4 w-4" /> Search Properties
-                </button>
-              )}
             </div>
           </div>
         </div>

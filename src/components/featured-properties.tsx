@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Maximize2, Layers, Award } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -125,6 +125,11 @@ export function FeaturedProperties({ properties }: FeaturedPropertiesProps) {
                 <img
                   src={getPropertyImage(property)}
                   alt={property.title}
+                  onError={(e: SyntheticEvent<HTMLImageElement>) => {
+                    const img = e.currentTarget;
+                    const fb = TYPE_PLACEHOLDERS[property.propertyType] || TYPE_PLACEHOLDERS.office;
+                    if (img.src !== fb) img.src = fb;
+                  }}
                   className="h-full w-full object-cover"
                 />
               </div>

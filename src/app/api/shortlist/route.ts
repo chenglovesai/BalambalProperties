@@ -9,8 +9,14 @@ export async function GET(req: NextRequest) {
   }
 
   const propertyId = req.nextUrl.searchParams.get("propertyId");
+
   if (!propertyId) {
-    return NextResponse.json({ isSaved: false });
+    const items = await prisma.shortlist.findMany({
+      where: { userId: session.user.id },
+      include: { property: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ properties: items.map((s) => s.property) });
   }
 
   const shortlist = await prisma.shortlist.findUnique({

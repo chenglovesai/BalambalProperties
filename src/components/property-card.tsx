@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { type SyntheticEvent } from "react";
 import {
   MapPin,
   Ruler,
@@ -58,9 +61,17 @@ export function PropertyCard({
     warehouse: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
     fnb: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop",
   };
+  const fallbackUrl = placeholders[propertyType] || placeholders.office;
   const validImages = images.filter((img) => img.startsWith("http") && !img.includes("loadingphoto") && !img.includes("placeholder"));
-  const imageUrl = validImages[0] || placeholders[propertyType] || placeholders.office;
+  const imageUrl = validImages[0] || fallbackUrl;
   const isHot = engagementScore > 50;
+
+  function handleImgError(e: SyntheticEvent<HTMLImageElement>) {
+    const img = e.currentTarget;
+    if (img.src !== fallbackUrl) {
+      img.src = fallbackUrl;
+    }
+  }
   const displayArea = saleableArea || grossArea;
   const hasRent = monthlyRent != null && monthlyRent > 0;
   const hasSalePrice = price != null && price > 0;
@@ -72,6 +83,7 @@ export function PropertyCard({
           <img
             src={imageUrl}
             alt={title}
+            onError={handleImgError}
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
           <div className="absolute left-3 top-3 flex gap-2">

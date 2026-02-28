@@ -28,6 +28,7 @@ const navLinks: NavItem[] = [
     href: "#",
     label: "Resources",
     children: [
+      { href: "/lease-reviewer", label: "AI Lease Reviewer" },
       { href: "/market", label: "Market Insights" },
       { href: "/solicitors", label: "Solicitor Directory" },
     ],
@@ -84,7 +85,7 @@ export function LandingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full px-4 pt-3 lg:px-6">
+    <header className="sticky top-0 z-30 w-full px-4 pt-3 lg:px-6">
       <div className="mx-auto max-w-5xl rounded-2xl border border-gray-200/60 bg-white/80 px-5 shadow-lg shadow-black/[0.04] backdrop-blur-xl">
         <div className="flex h-14 items-center justify-between">
           <Link

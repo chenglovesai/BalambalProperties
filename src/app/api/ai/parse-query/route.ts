@@ -56,7 +56,7 @@ function fallbackParse(query: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { query } = await req.json();
+    const { query, context } = await req.json();
 
     if (!query || typeof query !== "string") {
       return NextResponse.json(
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(parsed);
     }
 
-    const parsed = await parseNaturalLanguageQuery(query);
+    const parsed = await parseNaturalLanguageQuery(query, context);
     return NextResponse.json(parsed);
   } catch (error) {
     console.error("Parse query error:", error);

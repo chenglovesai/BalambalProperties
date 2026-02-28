@@ -54,6 +54,8 @@ export class TwentyEightHseScraper extends BaseScraper {
       }
     }
 
+    await this.enrichListingsWithDetailImages(allListings, options);
+
     return { listings: allListings, pagesScraped: totalPages };
   }
 

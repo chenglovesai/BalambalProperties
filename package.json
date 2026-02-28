@@ -41,6 +41,7 @@
     "next-auth": "^5.0.0-beta.30",
     "node-cron": "^4.2.1",
     "openai": "^6.25.0",
+    "pdfjs-dist": "^5.4.624",
     "playwright": "^1.58.2",
     "prisma": "^6.19.2",
     "react": "19.2.3",

@@ -60,4 +60,6 @@ export interface ScrapeOptions {
   fullScan: boolean;
   maxPagesPerCategory: number;
   delayBetweenRequests: number;
+  /** Max listings to visit for detail-page image enrichment (0 = all) */
+  maxDetailPages?: number;
 }

@@ -52,6 +52,8 @@ export class GoHomeScraper extends BaseScraper {
       await this.delay(options.delayBetweenRequests);
     }
 
+    await this.enrichListingsWithDetailImages(allListings, options);
+
     return { listings: allListings, pagesScraped: totalPages };
   }
 

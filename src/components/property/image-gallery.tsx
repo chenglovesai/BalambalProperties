@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type SyntheticEvent } from "react";
 import { ChevronLeft, ChevronRight, X, Expand, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+const FALLBACK_IMAGE = "/placeholder-property.svg";
+
+function handleImgError(e: SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  if (img.src !== FALLBACK_IMAGE) {
+    img.src = FALLBACK_IMAGE;
+  }
+}
 
 interface ImageGalleryProps {
   images: string[];
@@ -31,7 +40,8 @@ export function ImageGallery({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const allImages = images.length > 0 ? images : ["/placeholder-property.svg"];
+  const validImages = images.filter((img) => img.startsWith("http") && !img.includes("loadingphoto") && !img.includes("placeholder"));
+  const allImages = validImages.length > 0 ? validImages : [FALLBACK_IMAGE];
   const hasFloorPlan = !!floorPlanUrl;
   const displayImages = hasFloorPlan ? [...allImages, floorPlanUrl!] : allImages;
 
@@ -80,6 +90,7 @@ export function ImageGallery({
           <img
             src={allImages[0]}
             alt={title}
+            onError={handleImgError}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
@@ -158,6 +169,7 @@ export function ImageGallery({
                       ? "Floor Plan"
                       : `View ${i + 2}`
                   }
+                  onError={handleImgError}
                   className="h-full w-full object-cover transition-transform group-hover:scale-110"
                 />
                 {hasFloorPlan && i + 1 === allImages.length && (
@@ -214,6 +226,7 @@ export function ImageGallery({
             <img
               src={displayImages[currentIndex]}
               alt={`${title} - Image ${currentIndex + 1}`}
+              onError={handleImgError}
               className="max-h-full max-w-full object-contain select-none"
               draggable={false}
             />
@@ -246,6 +259,7 @@ export function ImageGallery({
                   <img
                     src={img}
                     alt={`Thumbnail ${i + 1}`}
+                    onError={handleImgError}
                     className="h-full w-full object-cover"
                   />
                 </button>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { ChevronDown, ArrowLeftRight, Calculator, Sparkles } from "lucide-react";
+import { ChevronDown, ArrowLeftRight, Calculator, Sparkles, Heart, Search } from "lucide-react";
+import Link from "next/link";
 
 interface Property {
   id: string;
@@ -292,11 +293,11 @@ export default function ComparePage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/properties?limit=50");
+        const res = await fetch("/api/shortlist");
         const data = await res.json();
         setProperties(data.properties ?? []);
       } catch {
-        console.error("Failed to load properties");
+        console.error("Failed to load shortlisted properties");
       } finally {
         setLoading(false);
       }
@@ -353,7 +354,7 @@ export default function ComparePage() {
           Compare Properties
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
-          Place two properties side-by-side to make an informed decision
+          Compare your shortlisted properties side-by-side to make an informed decision
         </p>
       </section>
 
@@ -362,8 +363,30 @@ export default function ComparePage() {
           <div className="flex justify-center py-20">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           </div>
+        ) : properties.length < 2 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Heart className="h-16 w-16 text-gray-200" />
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">
+              {properties.length === 0
+                ? "No shortlisted properties"
+                : "Need at least 2 shortlisted properties"}
+            </h3>
+            <p className="mt-2 max-w-sm text-sm text-gray-500">
+              Shortlist properties you&apos;re interested in, then come back here to compare them side-by-side.
+            </p>
+            <Link
+              href="/search"
+              className="mt-6 flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+            >
+              <Search className="h-4 w-4" />
+              Browse Properties
+            </Link>
+          </div>
         ) : (
           <>
+            <div className="mb-2 text-sm text-gray-500">
+              Showing your {properties.length} shortlisted {properties.length === 1 ? "property" : "properties"}
+            </div>
             <div className="flex items-end gap-3">
               <PropertySelector
                 properties={properties}
@@ -396,6 +419,7 @@ export default function ComparePage() {
                         <img
                           src={p.images[0]}
                           alt={p.title}
+                          onError={(e) => { e.currentTarget.src = "/placeholder-property.svg"; }}
                           className="h-48 w-full object-cover"
                         />
                       ) : (

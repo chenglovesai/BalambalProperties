@@ -71,12 +71,14 @@ export const DEFAULT_SCRAPE_OPTIONS: ScrapeOptions = {
   fullScan: false,
   maxPagesPerCategory: 15,
   delayBetweenRequests: 2500,
+  maxDetailPages: 100,
 };
 
 export const FULL_SCAN_OPTIONS: ScrapeOptions = {
   fullScan: true,
   maxPagesPerCategory: 1000,
   delayBetweenRequests: 3000,
+  maxDetailPages: 500,
 };
 
 export const DISTRICT_MAP: Record<string, string> = {

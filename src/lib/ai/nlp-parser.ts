@@ -41,16 +41,68 @@ Return a JSON object with this exact structure:
     "powerSupply": string | null
   },
   "businessContext": string | null,
-  "rawIntent": string
-}`;
+  "rawIntent": string,
+  "recommendation": string | null
+}
 
-export async function parseNaturalLanguageQuery(query: string): Promise<ParsedQuery> {
+The "recommendation" field is optional. When the user provides context (current filters, result count, property list), use it to give a brief, helpful recommendation (1-3 sentences) comparing or refining the search. E.g. "Of your 12 results, ground-floor units in Causeway Bay best match F&B needs — prioritize exhaust feasibility." Only include when you have meaningful context.`;
+
+interface ParseContext {
+  currentFilters?: {
+    districts?: string[];
+    types?: string[];
+    minRent?: number;
+    maxRent?: number;
+    minArea?: number;
+    maxArea?: number;
+    fengShuiRated?: boolean;
+  };
+  resultCount?: number;
+  propertySummaries?: Array<{
+    id: string;
+    title: string;
+    district: string;
+    propertyType: string;
+    monthlyRent: number | null;
+    saleableArea: number | null;
+    floor: string | null;
+  }>;
+}
+
+export async function parseNaturalLanguageQuery(
+  query: string,
+  context?: ParseContext
+): Promise<ParsedQuery & { recommendation?: string }> {
   try {
+    let userContent = query;
+    if (context) {
+      const ctxParts: string[] = ["[Current search context — use this to refine or compare]"];
+      if (context.currentFilters) {
+        const f = context.currentFilters;
+        const active: string[] = [];
+        if (f.districts?.length) active.push(`Districts: ${f.districts.join(", ")}`);
+        if (f.types?.length) active.push(`Types: ${f.types.join(", ")}`);
+        if (f.minRent || f.maxRent) active.push(`Budget: HK$${f.minRent ?? 0}–${f.maxRent ?? "any"}/mo`);
+        if (f.minArea || f.maxArea) active.push(`Area: ${f.minArea ?? "any"}–${f.maxArea ?? "any"} sqft`);
+        if (active.length) ctxParts.push(active.join(" | "));
+      }
+      if (context.resultCount != null) ctxParts.push(`Result count: ${context.resultCount}`);
+      if (context.propertySummaries?.length) {
+        ctxParts.push("\n[Current results — reference by title when comparing]");
+        context.propertySummaries.forEach((p, i) => {
+          const rent = p.monthlyRent ? `HK$${p.monthlyRent.toLocaleString()}/mo` : "—";
+          const area = p.saleableArea ? `${p.saleableArea} sqft` : "—";
+          ctxParts.push(`${i + 1}. ${p.title} | ${p.district} | ${p.propertyType} | ${rent} | ${area} | ${p.floor || "—"}`);
+        });
+      }
+      userContent = ctxParts.join("\n") + "\n\nUser query: " + query;
+    }
+
     const response = await openai.chat.completions.create({
       model: "MiniMax-Text-01",
       messages: [
         { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANT: Respond ONLY with a valid JSON object. No markdown, no explanation, just raw JSON." },
-        { role: "user", content: query },
+        { role: "user", content: userContent },
       ],
       temperature: 0.1,
       max_tokens: 500,
@@ -80,6 +132,7 @@ export async function parseNaturalLanguageQuery(query: string): Promise<ParsedQu
       },
       businessContext: parsed.businessContext || undefined,
       rawIntent: query,
+      recommendation: parsed.recommendation || undefined,
     };
   } catch (error) {
     console.error("NLP parsing error:", error);
