@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(content);
     } catch {
       // Attempt 2: strip markdown fences
-      const stripped = content.replace(/^```(?:json)?\s*/s, "").replace(/\s*```$/s, "").trim();
+      const stripped = content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
       try {
         parsed = JSON.parse(stripped);
       } catch {

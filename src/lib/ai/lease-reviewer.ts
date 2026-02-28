@@ -1,4 +1,8 @@
 import OpenAI from "openai";
+import { isBedrockConfigured } from "./bedrock-client";
+import { reviewLeaseWithBedrock } from "./lease-reviewer-bedrock";
+import { runComplianceAssessment } from "./compliance-agent-bedrock";
+import type { ComplianceAgentResult } from "@/types";
 
 const openai = new OpenAI({
   apiKey: process.env.MINIMAX_API_KEY,
@@ -20,6 +24,8 @@ export interface LeaseReviewResult {
   riskLevel: "low" | "medium" | "high" | "critical";
   issues: LeaseReviewIssue[];
   redFlags: string[];
+  /** Present when AWS Bedrock legal + compliance agents are used. */
+  compliance?: ComplianceAgentResult;
 }
 
 const SYSTEM_PROMPT = `You are an expert Hong Kong commercial lease reviewer. Your job is to identify shady, unfair, or problematic clauses in commercial lease agreements.
@@ -48,6 +54,12 @@ For each issue found:
 
 Return a valid JSON object. Be thorough but concise. If the lease text is too short or unclear, note that in the summary.`;
 
+/** Use AWS Bedrock legal + compliance agents when enabled and configured. */
+function useBedrockLeaseReview(): boolean {
+  const enabled = process.env.BEDROCK_LEASE_REVIEW_ENABLED === "true" || process.env.BEDROCK_LEASE_REVIEW_ENABLED === "1";
+  return enabled && isBedrockConfigured();
+}
+
 export async function reviewLease(leaseText: string): Promise<LeaseReviewResult> {
   const trimmed = leaseText.trim();
   if (!trimmed) {
@@ -58,6 +70,29 @@ export async function reviewLease(leaseText: string): Promise<LeaseReviewResult>
       issues: [],
       redFlags: ["No content to review"],
     };
+  }
+
+  if (useBedrockLeaseReview()) {
+    try {
+      const [legalResult, complianceResult] = await Promise.all([
+        reviewLeaseWithBedrock(trimmed),
+        runComplianceAssessment(trimmed),
+      ]);
+      return {
+        ...legalResult,
+        compliance: complianceResult,
+      };
+    } catch (error) {
+      console.error("Bedrock lease review error:", error);
+      return {
+        summary:
+          "AWS Bedrock review failed. Falling back is not configured. Please try again or use a solicitor.",
+        overallScore: 0,
+        riskLevel: "critical",
+        issues: [],
+        redFlags: ["Bedrock review failed. Please try again or seek professional advice."],
+      };
+    }
   }
 
   try {

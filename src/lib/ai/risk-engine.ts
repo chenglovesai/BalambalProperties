@@ -1,10 +1,19 @@
 import OpenAI from "openai";
+import { isBedrockConfigured } from "./bedrock-client";
+import { runRiskAssessmentWithBedrock } from "./risk-engine-bedrock";
 import type { RiskRubricResult } from "@/types";
 
 const openai = new OpenAI({
   apiKey: process.env.MINIMAX_API_KEY,
   baseURL: "https://api.minimaxi.chat/v1",
 });
+
+function useBedrockRiskAssessment(): boolean {
+  const enabled =
+    process.env.BEDROCK_RISK_ASSESSMENT_ENABLED === "true" ||
+    process.env.BEDROCK_RISK_ASSESSMENT_ENABLED === "1";
+  return enabled && isBedrockConfigured();
+}
 
 interface PropertyContext {
   title: string;
@@ -89,6 +98,22 @@ UBW Status: ${property.evidencePack?.ubwStatus || "Unknown"}
 UBW Detail: ${property.evidencePack?.ubwDetail || "None"}
 Building Record: ${property.evidencePack?.buildingRecordStatus || "Unknown"}
 `;
+
+  if (useBedrockRiskAssessment()) {
+    try {
+      return await runRiskAssessmentWithBedrock(sectorType, property);
+    } catch (error) {
+      console.error("Bedrock risk assessment error:", error);
+      return checks.map((checkName) => ({
+        checkName,
+        status: "unknown" as const,
+        confidence: 0,
+        explanation: "Bedrock assessment failed. Try again or use professional verification.",
+        recommendation: "Consult a qualified professional for compliance verification.",
+        sources: [],
+      }));
+    }
+  }
 
   try {
     const response = await openai.chat.completions.create({
