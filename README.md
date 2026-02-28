@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Balambal Properties
+
+AI-powered commercial real estate platform for SMEs in Hong Kong. Find, evaluate, and shortlist verified commercial properties with intelligent search, compliance pre-checks, and evidence packs.
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router, Server Components)
+- **Language**: TypeScript
+- **Database**: PostgreSQL with pgvector
+- **ORM**: Prisma
+- **Auth**: NextAuth.js v5
+- **UI**: Tailwind CSS + shadcn/ui-style components
+- **AI**: OpenAI GPT-4o + text-embedding-3-small
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 15+ with pgvector extension
+- OpenAI API key (for AI features)
+
+### Setup
+
+1. **Install dependencies:**
+
+```bash
+npm install
+```
+
+2. **Configure environment:**
+
+Copy `.env` and update the values:
+
+```
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/balambal?schema=public"
+NEXTAUTH_SECRET="generate-a-random-secret"
+NEXTAUTH_URL="http://localhost:3000"
+OPENAI_API_KEY="sk-your-key-here"
+```
+
+3. **Set up the database:**
+
+```bash
+# Create database and run migrations
+npx prisma db push
+
+# Seed with sample data
+npx tsx src/scripts/seed.ts
+```
+
+4. **Start the dev server:**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Demo Account
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+After seeding, log in with:
+- Email: `demo@balambal.com`
+- Password: `demo1234`
 
-## Learn More
+## Features (MVP)
 
-To learn more about Next.js, take a look at the following resources:
+- **AI-Powered Search**: Natural language query parsing converts descriptions into structured filters
+- **Home Feed**: Curated hot properties ranked by engagement
+- **Property Detail**: Normalized data with image gallery, key metrics, and source attribution
+- **Evidence Pack**: Verification checklist (ownership, floor plan, building record, tenancy, UBW)
+- **Fit-for-Use Risk Assessment**: Sector-specific compliance pre-checks for F&B, Retail, and Warehouse
+- **Shortlisting**: Save properties and track interactions
+- **Onboarding Wizard**: Multi-step profile setup for personalized recommendations
+- **Filter & Sort**: District, property type, rent range, area range with real-time filtering
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+├── app/               # Next.js App Router pages and API routes
+├── components/        # React components (UI primitives + feature components)
+├── lib/               # Core libraries (prisma, auth, AI modules, validators)
+├── types/             # TypeScript type definitions
+└── scripts/           # Database seed and ingestion scripts
+```
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private - All rights reserved.
