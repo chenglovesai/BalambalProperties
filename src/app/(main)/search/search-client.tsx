@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -192,6 +192,12 @@ export function SearchPageClient({
 
   function applyFilters() {
     const p = new URLSearchParams();
+    // Start with any AI-extracted filters
+    if (lastQuery && lastQuery.includes("=")) {
+      const aiParams = new URLSearchParams(lastQuery);
+      aiParams.forEach((v, k) => p.set(k, v));
+    }
+    // Manual filters override AI-extracted ones
     if (location) p.set("districts", location);
     if (minPrice) p.set("minRent", minPrice);
     if (maxPrice) p.set("maxRent", maxPrice);
@@ -218,8 +224,10 @@ export function SearchPageClient({
     setMinFengShui("");
     setLocation("");
     setDuration("");
-    router.push("/search");
-    setPanelOpen(false);
+    setChatMessages([]);
+    setSuggestedChips([]);
+    setLastQuery("");
+    setFiltersSentToAi(false);
   }
 
   function handleQuickSearch(q: { districts: string; types: string }) {
@@ -839,21 +847,21 @@ export function SearchPageClient({
                 </div>
 
                 <div className="border-t border-gray-200 bg-white px-5 py-4 space-y-3 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
-                      placeholder="Describe what you need..."
-                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-black placeholder:text-gray-400 focus:border-gray-400 focus:outline-none" />
-                    <button type="button" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-800 disabled:opacity-40">
-                      <Send className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {lastQuery && (
-                    <button type="button" onClick={handleChatSearch}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
-                      <Search className="h-4 w-4" /> Search Properties
-                    </button>
+                  {filtersSentToAi ? (
+                    <div className="flex items-center gap-2">
+                      <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
+                        placeholder="Ask a follow-up or add more details..."
+                        className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-black placeholder:text-gray-400 focus:border-gray-400 focus:outline-none" />
+                      <button type="button" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-800 disabled:opacity-40">
+                        <Send className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="py-2 text-center text-xs text-gray-400">
+                      Select filters and click <span className="font-semibold text-gray-600">&quot;Send to AI&quot;</span> to start
+                    </p>
                   )}
                 </div>
               </div>
