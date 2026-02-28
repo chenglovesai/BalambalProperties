@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.MINIMAX_API_KEY,
-  baseURL: "https://api.minimaxi.chat/v1",
-});
+let _openai: OpenAI | null = null;
+function getOpenAI() {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.MINIMAX_API_KEY,
+      baseURL: "https://api.minimaxi.chat/v1",
+    });
+  }
+  return _openai;
+}
 
 const SYSTEM_PROMPT = `You are a Hong Kong commercial real estate advisor chatbot embedded in a property search platform called Balambal.
 
@@ -142,7 +148,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "MiniMax-Text-01",
       messages: apiMessages,
       temperature: 0.4,

@@ -4,10 +4,16 @@ import { reviewLeaseWithBedrock } from "./lease-reviewer-bedrock";
 import { runComplianceAssessment } from "./compliance-agent-bedrock";
 import type { ComplianceAgentResult } from "@/types";
 
-const openai = new OpenAI({
-  apiKey: process.env.MINIMAX_API_KEY,
-  baseURL: "https://api.minimaxi.chat/v1",
-});
+let _openai: OpenAI | null = null;
+function getOpenAI() {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.MINIMAX_API_KEY,
+      baseURL: "https://api.minimaxi.chat/v1",
+    });
+  }
+  return _openai;
+}
 
 export interface LeaseReviewIssue {
   category: string;
@@ -96,7 +102,7 @@ export async function reviewLease(leaseText: string): Promise<LeaseReviewResult>
   }
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "MiniMax-Text-01",
       messages: [
         {
