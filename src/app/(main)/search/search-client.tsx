@@ -391,15 +391,6 @@ export function SearchPageClient({
               </button>
             </form>
 
-            {/* AI Advisor Button - opens same panel as Filters (panelOpen) */}
-            <button
-              type="button"
-              onClick={() => setPanelOpen(true)}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex-shrink-0"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">AI Advisor</span>
-            </button>
           </div>
 
           {/* Active Filters + Sort */}
