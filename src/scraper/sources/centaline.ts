@@ -22,6 +22,7 @@ interface CentalineCard {
   agentPhone: string;
   features: string[];
   propertyNo: string;
+  images: string[];
 }
 
 export class CentalineScraper extends BaseScraper {
@@ -146,6 +147,19 @@ export class CentalineScraper extends BaseScraper {
         ];
         const features = featureKeywords.filter((kw) => text.includes(kw));
 
+        const imgElements = Array.from(container.querySelectorAll("img"));
+        const images: string[] = [];
+        for (const img of imgElements) {
+          const el = img as HTMLImageElement;
+          const src = el.getAttribute("data-src")
+            || el.getAttribute("data-original")
+            || el.getAttribute("data-lazy-src")
+            || el.src;
+          if (src && src.startsWith("http") && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon") && !src.includes("placeholder") && !src.includes("no-photo")) {
+            images.push(src);
+          }
+        }
+
         cards.push({
           id: uuidMatch[1],
           url: href,
@@ -163,6 +177,7 @@ export class CentalineScraper extends BaseScraper {
           agentPhone: "",
           features,
           propertyNo: propNoMatch?.[1] || "",
+          images,
         });
       }
 
@@ -239,7 +254,7 @@ export class CentalineScraper extends BaseScraper {
       salePrice,
       psfPrice: psfPriceVal,
       floor: card.floorLevel ? `${card.floorLevel} Floor` : undefined,
-      images: [],
+      images: card.images,
       agentName: card.agentName || undefined,
       agentContact: card.agentPhone || undefined,
       agentLicense: card.agentLicense || undefined,

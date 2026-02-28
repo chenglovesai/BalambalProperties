@@ -17,6 +17,21 @@ import { FeaturedProperties } from "@/components/featured-properties";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/utils";
 
+const TYPE_PLACEHOLDERS: Record<string, string> = {
+  office: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=300&fit=crop",
+  retail: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+  industrial: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
+  warehouse: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
+  fnb: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop",
+};
+
+function getPropertyImage(images: string[], propertyType: string): string {
+  const valid = images.filter(
+    (img) => img.startsWith("http") && !img.includes("loadingphoto") && !img.includes("placeholder")
+  );
+  return valid[0] || TYPE_PLACEHOLDERS[propertyType] || TYPE_PLACEHOLDERS.office;
+}
+
 async function getHotProperties() {
   try {
     return await prisma.property.findMany({
@@ -180,10 +195,7 @@ export default async function HomePage() {
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
                     <img
-                      src={
-                        property.images[0] ||
-                        "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400"
-                      }
+                      src={getPropertyImage(property.images, property.propertyType)}
                       alt={property.title}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />

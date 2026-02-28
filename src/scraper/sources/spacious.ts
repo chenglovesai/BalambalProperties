@@ -180,11 +180,15 @@ export class SpaciousScraper extends BaseScraper {
         const priceMatch = text.match(/HK\$\s*([\d,]+(?:\.\d+)?[MBK]?)/i) || text.match(/\$([\d,]+)/);
         const psfMatch = text.match(/@\s*\$([\d,.]+)/);
 
-        const imgElements = Array.from(el.querySelectorAll("img[src]"));
+        const imgElements = Array.from(el.querySelectorAll("img"));
         const images: string[] = [];
         for (const img of imgElements) {
-          const src = (img as HTMLImageElement).src || (img as HTMLImageElement).dataset.src || "";
-          if (src && !src.includes("avatar") && !src.includes("logo")) {
+          const imgEl = img as HTMLImageElement;
+          const src = imgEl.getAttribute("data-src")
+            || imgEl.getAttribute("data-original")
+            || imgEl.getAttribute("data-lazy-src")
+            || imgEl.src;
+          if (src && src.startsWith("http") && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon") && !src.includes("placeholder") && !src.includes("no-photo")) {
             images.push(src);
           }
         }

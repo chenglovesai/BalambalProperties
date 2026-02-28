@@ -1,16 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
-import { PropertyCard } from "@/components/property-card";
-import { SearchFilters } from "@/components/search-filters";
-import { AiChat } from "@/components/ai-chat";
-import { SearchWizard } from "@/components/search-wizard";
-import { WhatIfBar } from "@/components/what-if-bar";
-import { X, ArrowLeft, SlidersHorizontal, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import Link from "next/link";
-import { formatCurrency } from "@/lib/utils";
+import { SearchPageClient } from "./search-client";
 
 interface SearchPageProps {
   searchParams: Promise<{
@@ -23,7 +16,6 @@ interface SearchPageProps {
     maxArea?: string;
     sort?: string;
     page?: string;
-    view?: string;
     mode?: string;
   }>;
 }
@@ -68,7 +60,7 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
     ];
   }
 
-  if (params.q && !params.districts && !params.types) {
+  if (params.q) {
     where.AND = [
       ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
       {
@@ -122,242 +114,61 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
       prisma.property.count({ where }),
     ]);
 
-    return { properties, total, page, limit };
+    return {
+      properties: properties.map((p) => ({
+        id: p.id,
+        title: p.title,
+        district: p.district,
+        address: p.address,
+        propertyType: p.propertyType,
+        monthlyRent: p.monthlyRent,
+        saleableArea: p.saleableArea,
+        grossArea: p.grossArea,
+        price: p.price,
+        images: p.images,
+        verificationScore: p.verificationScore,
+        engagementScore: p.engagementScore,
+        floor: p.floor,
+        aiScore: p.aiScore,
+        buildingGrade: p.buildingGrade,
+        sourceCount: p._count.sourceListings,
+      })),
+      total,
+      page,
+      limit,
+    };
   } catch {
     return { properties: [], total: 0, page: 1, limit: 24 };
   }
 }
 
-async function ResultsView({ params }: { params: Awaited<SearchPageProps["searchParams"]> }) {
-  const { properties, total, page, limit } = await searchProperties(params);
-  const totalPages = Math.ceil(total / limit);
-
-  const gradeColor: Record<string, string> = {
-    A: "bg-emerald-100 text-emerald-700",
-    B: "bg-blue-100 text-blue-700",
-    C: "bg-amber-100 text-amber-700",
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/search"
-              className="flex items-center gap-2 text-sm text-gray-500 hover:text-black transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to search
-            </Link>
-            <span className="text-sm text-gray-400">
-              {total} {total === 1 ? "property" : "properties"} found
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/search?${new URLSearchParams(params as Record<string, string>).toString()}&mode=wizard`}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Add extra detail
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* What If bar */}
-      <WhatIfBar currentParams={params} />
-
-      {properties.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center">
-          <div className="text-6xl mb-4">🏢</div>
-          <h3 className="text-lg font-semibold text-black">No properties found</h3>
-          <p className="mt-2 text-sm text-gray-500">
-            Try adjusting your filters or search with different terms.
-          </p>
-          <div className="mt-6 flex gap-3">
-            <Link
-              href="/search"
-              className="rounded-lg bg-black px-6 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
-            >
-              Modify Search
-            </Link>
-            <Link
-              href="/search?mode=wizard"
-              className="rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Try Guided Search
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="mx-auto max-w-7xl p-6">
-          {/* Sort options */}
-          <div className="mb-4 flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Sort by:</span>
-            {[
-              { value: "score", label: "AI Score" },
-              { value: "price_asc", label: "Price ↑" },
-              { value: "price_desc", label: "Price ↓" },
-              { value: "area_desc", label: "Largest" },
-              { value: "recent", label: "Newest" },
-            ].map((s) => {
-              const currentSort = params.sort || "score";
-              const isActive = currentSort === s.value;
-              const newParams = new URLSearchParams(params as Record<string, string>);
-              newParams.set("sort", s.value);
-              newParams.set("view", "results");
-              return (
-                <Link
-                  key={s.value}
-                  href={`/search?${newParams.toString()}`}
-                  className={`rounded-full px-3 py-1 transition-colors ${
-                    isActive
-                      ? "bg-black text-white"
-                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  {s.label}
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {properties.map((property) => (
-              <div key={property.id} className="relative group">
-                <PropertyCard
-                  id={property.id}
-                  title={property.title}
-                  district={property.district}
-                  address={property.address}
-                  propertyType={property.propertyType}
-                  monthlyRent={property.monthlyRent}
-                  saleableArea={property.saleableArea}
-                  grossArea={property.grossArea}
-                  price={property.price}
-                  images={property.images}
-                  verificationScore={property.verificationScore}
-                  engagementScore={property.engagementScore}
-                  floor={property.floor}
-                  sourceCount={property._count.sourceListings}
-                />
-                {/* Overlay badges */}
-                <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-[1] pointer-events-none">
-                  {property.aiScore != null && (
-                    <span className="flex items-center gap-1 rounded-full bg-black/80 px-2 py-0.5 text-xs font-medium text-amber-400 backdrop-blur">
-                      <Sparkles className="h-3 w-3" />
-                      {property.aiScore}/100
-                    </span>
-                  )}
-                  {property.buildingGrade && (
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${gradeColor[property.buildingGrade] || "bg-gray-100 text-gray-600"}`}>
-                      Grade {property.buildingGrade}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-2">
-              {page > 1 && (
-                <Link
-                  href={`/search?${(() => { const p = new URLSearchParams(params as Record<string, string>); p.set("page", String(page - 1)); p.set("view", "results"); return p.toString(); })()}`}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Previous
-                </Link>
-              )}
-              <span className="px-4 py-2 text-sm text-gray-500">
-                Page {page} of {totalPages}
-              </span>
-              {page < totalPages && (
-                <Link
-                  href={`/search?${(() => { const p = new URLSearchParams(params as Record<string, string>); p.set("page", String(page + 1)); p.set("view", "results"); return p.toString(); })()}`}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Next
-                </Link>
-              )}
-            </div>
-          )}
-
-          {/* Not happy? */}
-          <div className="mt-12 rounded-2xl border border-gray-200 bg-white p-8 text-center">
-            <h3 className="text-lg font-semibold">Not happy with what you found?</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Try adjusting your criteria or use our guided search wizard for better results.
-            </p>
-            <div className="mt-4 flex justify-center gap-3">
-              <Link
-                href="/search?mode=wizard"
-                className="rounded-lg bg-black px-6 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
-              >
-                Look for more properties
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
 
-  if (params.view === "results") {
-    return (
-      <Suspense
-        fallback={
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="text-gray-500 text-sm">Loading results...</div>
-          </div>
-        }
-      >
-        <ResultsView params={params} />
-      </Suspense>
-    );
-  }
+  const hasAnyFilter = !!(
+    params.districts || params.types || params.minRent || params.maxRent ||
+    params.minArea || params.maxArea || params.q
+  );
 
-  if (params.mode === "wizard") {
-    return (
-      <div className="fixed inset-0 z-50 bg-[#111]">
-        <Link
-          href="/"
-          className="absolute right-5 top-5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </Link>
-        <SearchWizard />
-      </div>
-    );
-  }
+  const { properties, total, page, limit } = await searchProperties(params);
+  const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#111]">
-      <Link
-        href="/"
-        className="absolute right-5 top-5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white transition-colors"
-      >
-        <X className="h-4 w-4" />
-      </Link>
-
-      <div className="flex h-full">
-        <div className="w-[340px] flex-shrink-0 border-r border-white/10">
-          <Suspense>
-            <SearchFilters />
-          </Suspense>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-gray-500 text-sm">Loading...</div>
         </div>
-        <div className="flex-1">
-          <AiChat />
-        </div>
-      </div>
-    </div>
+      }
+    >
+      <SearchPageClient
+        properties={properties}
+        total={total}
+        page={page}
+        totalPages={totalPages}
+        params={params}
+        hasAnyFilter={hasAnyFilter}
+      />
+    </Suspense>
   );
 }

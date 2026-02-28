@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight, Maximize2, Layers, Award } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +30,21 @@ interface Property {
 
 interface FeaturedPropertiesProps {
   properties: Property[];
+}
+
+const TYPE_PLACEHOLDERS: Record<string, string> = {
+  office: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=300&fit=crop",
+  retail: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+  industrial: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
+  warehouse: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
+  fnb: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop",
+};
+
+function getPropertyImage(property: Property): string {
+  const valid = property.images.filter(
+    (img) => img.startsWith("http") && !img.includes("loadingphoto") && !img.includes("placeholder")
+  );
+  return valid[0] || TYPE_PLACEHOLDERS[property.propertyType] || TYPE_PLACEHOLDERS.office;
 }
 
 export function FeaturedProperties({ properties }: FeaturedPropertiesProps) {
@@ -107,15 +121,10 @@ export function FeaturedProperties({ properties }: FeaturedPropertiesProps) {
               key={property.id}
               className="overflow-hidden rounded-xl bg-white shadow-sm"
             >
-              <div className="aspect-[4/3] overflow-hidden">
-                <Image
-                  src={
-                    property.images[0] ||
-                    "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400"
-                  }
+              <div className="aspect-[4/3] overflow-hidden bg-muted">
+                <img
+                  src={getPropertyImage(property)}
                   alt={property.title}
-                  width={400}
-                  height={300}
                   className="h-full w-full object-cover"
                 />
               </div>

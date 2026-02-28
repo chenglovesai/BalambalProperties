@@ -51,7 +51,15 @@ export function PropertyCard({
   engagementScore,
   sourceCount,
 }: PropertyCardProps) {
-  const imageUrl = images[0] || "/placeholder-property.svg";
+  const placeholders: Record<string, string> = {
+    office: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=300&fit=crop",
+    retail: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+    industrial: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
+    warehouse: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop",
+    fnb: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop",
+  };
+  const validImages = images.filter((img) => img.startsWith("http") && !img.includes("loadingphoto") && !img.includes("placeholder"));
+  const imageUrl = validImages[0] || placeholders[propertyType] || placeholders.office;
   const isHot = engagementScore > 50;
   const displayArea = saleableArea || grossArea;
   const hasRent = monthlyRent != null && monthlyRent > 0;

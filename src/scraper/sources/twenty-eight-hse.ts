@@ -142,11 +142,16 @@ export class TwentyEightHseScraper extends BaseScraper {
 
         const floorMatch = text.match(/(\d+\/F|G\/F|B\/F|[A-Z]+ Floor|High Floor|Middle Floor|Low Floor|Ground Floor)/i);
 
-        const imgElements = Array.from(container.querySelectorAll("img[src]"));
+        const imgElements = Array.from(container.querySelectorAll("img"));
         const images: string[] = [];
         for (const img of imgElements) {
-          const src = (img as HTMLImageElement).src;
-          if (src && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon")) {
+          const el = img as HTMLImageElement;
+          const src = el.getAttribute("data-src")
+            || el.getAttribute("data-original")
+            || el.getAttribute("data-lazy-src")
+            || el.getAttribute("data-srcset")?.split(",")[0]?.trim()?.split(" ")[0]
+            || el.src;
+          if (src && src.startsWith("http") && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon") && !src.includes("loadingphoto") && !src.includes("placeholder")) {
             images.push(src);
           }
         }

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   ArrowLeft,
   MapPin,
@@ -9,42 +10,31 @@ import {
   Building,
   DollarSign,
   Layers,
-  Calendar,
-  Share2,
-  ExternalLink,
-  Phone,
-  Mail,
-  User,
-  Briefcase,
   CheckCircle,
   XCircle,
   Clock,
   Sparkles,
   Shield,
-  TrendingUp,
   HelpCircle,
-  AlertTriangle,
-  Train,
-  ArrowUpDown,
-  Wind,
-  Flame,
-  Video,
-  Star,
   CircleDot,
-  Lightbulb,
-  MessageSquareWarning,
-  FileQuestion,
-  Scale,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
 import { EvidencePack } from "@/components/evidence-pack";
 import { RiskAssessment } from "@/components/risk-assessment";
 import { ShortlistButton } from "@/components/shortlist-button";
+import { ImageGallery } from "@/components/property/image-gallery";
+import { ShareButton } from "@/components/property/share-button";
+import { ContactDialog } from "@/components/property/contact-dialog";
+import { ScheduleViewing } from "@/components/property/schedule-viewing";
+import { LocationMap } from "@/components/property/location-map";
+import { SimilarProperties } from "@/components/property/similar-properties";
+import { OverviewTab } from "@/components/property/overview-tab";
+import { CostsTab } from "@/components/property/costs-tab";
+import { AISummaryTab } from "@/components/property/ai-summary-tab";
+import { SourcesTab } from "@/components/property/sources-tab";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatArea, formatPsf } from "@/lib/utils";
 
@@ -139,16 +129,21 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
   if (!property) notFound();
 
-  const images = property.images.length > 0 ? property.images : ["/placeholder-property.svg"];
+  const placeholders: Record<string, string> = {
+    office: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=500&fit=crop",
+    retail: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=500&fit=crop",
+    industrial: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=500&fit=crop",
+    warehouse: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=500&fit=crop",
+    fnb: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=500&fit=crop",
+  };
+  const validImages = property.images.filter(
+    (img) => img.startsWith("http") && !img.includes("loadingphoto") && !img.includes("placeholder")
+  );
+  const images = validImages.length > 0
+    ? validImages
+    : [placeholders[property.propertyType] || placeholders.office];
   const regulatoryNotes = (property.regulatoryNotes as RegulatoryItem[] | null) ?? [];
   const aiSummary = generateAISummary(property);
-
-  const totalMonthly = (property.monthlyRent ?? 0) + (property.managementFee ?? 0);
-  const totalUpfront =
-    (property.buildingDeposit ?? 0) +
-    (property.agentCommission ?? 0) +
-    (property.legalFees ?? 0) +
-    (property.stampDuty ?? 0);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -166,63 +161,18 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
       <div className="grid gap-8 lg:grid-cols-3">
         {/* ─── Main Content ─── */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Image Gallery */}
-          <div className="overflow-hidden rounded-xl border bg-white">
-            <div className="relative aspect-[16/9] bg-muted">
-              <img
-                src={images[0]}
-                alt={property.title}
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute left-4 top-4 flex gap-2">
-                <Badge variant="secondary" className="backdrop-blur-sm bg-white/90 text-foreground">
-                  {typeLabels[property.propertyType] || property.propertyType}
-                </Badge>
-                {property.buildingGrade && (
-                  <Badge
-                    variant="outline"
-                    className={`backdrop-blur-sm border ${gradeColors[property.buildingGrade] ?? "bg-gray-100 text-gray-800 border-gray-300"}`}
-                  >
-                    Grade {property.buildingGrade}
-                  </Badge>
-                )}
-              </div>
-              {property.aiScore != null && (
-                <div className="absolute right-4 top-4">
-                  <div className="flex items-center gap-2 rounded-full bg-white/90 backdrop-blur-sm px-3 py-1.5 shadow-sm">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-bold text-primary">{property.aiScore}</span>
-                    <span className="text-xs text-muted-foreground">/100</span>
-                  </div>
-                </div>
-              )}
-              {property.videoTourUrl && (
-                <a
-                  href={property.videoTourUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute bottom-4 right-4"
-                >
-                  <Button size="sm" className="gap-1.5 bg-white/90 text-foreground backdrop-blur-sm hover:bg-white">
-                    <Video className="h-4 w-4" />
-                    Video Tour
-                  </Button>
-                </a>
-              )}
-            </div>
-            {images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto p-3">
-                {images.slice(1, 5).map((img, i) => (
-                  <img
-                    key={i}
-                    src={img}
-                    alt={`View ${i + 2}`}
-                    className="h-20 w-28 flex-shrink-0 rounded-lg object-cover"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Image Gallery with Lightbox */}
+          <ImageGallery
+            images={images}
+            title={property.title}
+            propertyType={property.propertyType}
+            buildingGrade={property.buildingGrade}
+            aiScore={property.aiScore}
+            videoTourUrl={property.videoTourUrl}
+            floorPlanUrl={property.floorPlanUrl}
+            typeLabel={typeLabels[property.propertyType] || property.propertyType}
+            gradeColor={gradeColors[property.buildingGrade ?? ""] ?? "bg-gray-100 text-gray-800 border-gray-300"}
+          />
 
           {/* Title, Location & Badges */}
           <div className="space-y-3">
@@ -308,206 +258,69 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             </TabsList>
 
             {/* ── Overview Tab ── */}
-            <TabsContent value="overview" className="space-y-6">
-              {/* Description */}
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="text-base">Description</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {property.description}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Property Details */}
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="text-base">Property Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
-                    <DetailItem label="Property Type" value={typeLabels[property.propertyType] || property.propertyType} />
-                    <DetailItem label="District" value={property.district} />
-                    {property.grossArea != null && <DetailItem label="Gross Area" value={formatArea(property.grossArea)} />}
-                    {property.saleableArea != null && <DetailItem label="Saleable Area" value={formatArea(property.saleableArea)} />}
-                    {property.ceilingHeight != null && <DetailItem label="Ceiling Height" value={`${property.ceilingHeight}m`} />}
-                    {property.floor && <DetailItem label="Floor" value={property.floor} />}
-                    {property.mtrStation && (
-                      <div>
-                        <p className="text-muted-foreground flex items-center gap-1">
-                          <Train className="h-3.5 w-3.5" /> MTR Station
-                        </p>
-                        <p className="font-medium">
-                          {property.mtrStation}
-                          {property.mtrProximity && <span className="text-muted-foreground font-normal"> ({property.mtrProximity})</span>}
-                        </p>
-                      </div>
-                    )}
-                    <DetailItem
-                      label="Loading Access"
-                      value={property.loadingAccess ? "Yes" : "No"}
-                      icon={<ArrowUpDown className="h-3.5 w-3.5" />}
-                    />
-                    <DetailItem
-                      label="Exhaust System"
-                      value={property.hasExhaust ? "Installed" : "Not Installed"}
-                      icon={<Wind className="h-3.5 w-3.5" />}
-                    />
-                    <DetailItem
-                      label="FSD Certification"
-                      value={property.hasFSD ? "Certified" : "Not Certified"}
-                      icon={<Flame className="h-3.5 w-3.5" />}
-                    />
-                    <DetailItem label="Listed" value={property.createdAt.toLocaleDateString()} />
-                  </div>
-                </CardContent>
-              </Card>
+            <TabsContent value="overview">
+              <OverviewTab
+                description={property.description}
+                propertyType={property.propertyType}
+                district={property.district}
+                address={property.address}
+                saleableArea={property.saleableArea}
+                grossArea={property.grossArea}
+                ceilingHeight={property.ceilingHeight}
+                floor={property.floor}
+                mtrStation={property.mtrStation}
+                mtrProximity={property.mtrProximity}
+                loadingAccess={property.loadingAccess}
+                hasExhaust={property.hasExhaust}
+                hasFSD={property.hasFSD}
+                buildingGrade={property.buildingGrade}
+                buildingName={property.buildingName}
+                floorPlanUrl={property.floorPlanUrl}
+                createdAt={property.createdAt}
+                updatedAt={property.updatedAt}
+                features={property.features as Record<string, unknown> | null}
+                title={property.title}
+              />
             </TabsContent>
 
             {/* ── Cost Breakdown Tab ── */}
-            <TabsContent value="costs" className="space-y-6">
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                    Cost Breakdown
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Monthly Costs */}
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Monthly Costs
-                    </h3>
-                    <div className="space-y-2">
-                      <CostLine label="Monthly Rent" amount={property.monthlyRent} />
-                      <CostLine label="Management Fee" amount={property.managementFee} />
-                      <Separator />
-                      <CostLine label="Total Monthly Cost" amount={totalMonthly > 0 ? totalMonthly : null} bold />
-                    </div>
-                  </div>
-
-                  {/* Upfront Costs */}
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Upfront Costs
-                    </h3>
-                    <div className="space-y-2">
-                      <CostLine label="Building Deposit" amount={property.buildingDeposit} />
-                      <CostLine label="Agent Commission" amount={property.agentCommission} />
-                      <CostLine label="Legal Fees" amount={property.legalFees} />
-                      {property.stampDuty != null && (
-                        <CostLine label="Stamp Duty" amount={property.stampDuty} />
-                      )}
-                      <Separator />
-                      <CostLine label="Total Upfront Cost" amount={totalUpfront > 0 ? totalUpfront : null} bold />
-                    </div>
-                  </div>
-
-                  {totalMonthly > 0 && totalUpfront > 0 && (
-                    <div className="rounded-lg bg-primary/5 border border-primary/10 p-4">
-                      <p className="text-sm text-muted-foreground">
-                        To move in you&apos;ll need approximately{" "}
-                        <span className="font-bold text-foreground">{formatCurrency(totalUpfront + totalMonthly)}</span>{" "}
-                        (first month + upfront costs).
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            <TabsContent value="costs">
+              <CostsTab
+                monthlyRent={property.monthlyRent}
+                managementFee={property.managementFee}
+                buildingDeposit={property.buildingDeposit}
+                agentCommission={property.agentCommission}
+                legalFees={property.legalFees}
+                stampDuty={property.stampDuty}
+                saleableArea={property.saleableArea}
+                psfRent={property.psfRent}
+                price={property.price}
+                district={property.district}
+              />
             </TabsContent>
 
             {/* ── AI Summary Tab ── */}
-            <TabsContent value="ai-summary" className="space-y-6">
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    AI-Generated Summary
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Analysis based on available property data. Verify independently before making decisions.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Benefits */}
-                  {aiSummary.benefits.length > 0 && (
-                    <div>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
-                        <TrendingUp className="h-4 w-4 text-emerald-600" />
-                        Benefits
-                      </h3>
-                      <ul className="space-y-2">
-                        {aiSummary.benefits.map((b, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />
-                            {b}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Trade-offs */}
-                  {aiSummary.tradeoffs.length > 0 && (
-                    <div>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
-                        <MessageSquareWarning className="h-4 w-4 text-amber-600" />
-                        Trade-offs
-                      </h3>
-                      <ul className="space-y-2">
-                        {aiSummary.tradeoffs.map((t, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
-                            {t}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Key Unknowns */}
-                  {aiSummary.unknowns.length > 0 && (
-                    <div>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
-                        <FileQuestion className="h-4 w-4 text-blue-600" />
-                        Key Unknowns to Ask Agent
-                      </h3>
-                      <ul className="space-y-2">
-                        {aiSummary.unknowns.map((u, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <HelpCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-500" />
-                            {u}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Regulations Summary */}
-                  {regulatoryNotes.length > 0 && (
-                    <div>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
-                        <Scale className="h-4 w-4 text-purple-600" />
-                        Regulations Summary
-                      </h3>
-                      <div className="rounded-lg border p-3 space-y-2">
-                        {regulatoryNotes.map((item, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm">
-                            <RegulatoryStatusIcon status={item.status} />
-                            <span className="text-muted-foreground">{item.label}</span>
-                            {item.note && (
-                              <span className="ml-auto text-xs text-muted-foreground">{item.note}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            <TabsContent value="ai-summary">
+              <AISummaryTab
+                aiScore={property.aiScore}
+                benefits={aiSummary.benefits}
+                tradeoffs={aiSummary.tradeoffs}
+                unknowns={aiSummary.unknowns}
+                regulatoryNotes={regulatoryNotes}
+                propertyType={property.propertyType}
+                district={property.district}
+                monthlyRent={property.monthlyRent}
+                psfRent={property.psfRent}
+                saleableArea={property.saleableArea}
+                buildingGrade={property.buildingGrade}
+                hasExhaust={property.hasExhaust}
+                hasFSD={property.hasFSD}
+                loadingAccess={property.loadingAccess}
+                mtrStation={property.mtrStation}
+                ceilingHeight={property.ceilingHeight}
+                floor={property.floor}
+                verificationScore={property.verificationScore}
+              />
             </TabsContent>
 
             {/* ── Evidence Tab ── */}
@@ -542,43 +355,49 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
             {/* ── Sources Tab ── */}
             <TabsContent value="sources">
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="text-base">Listing Sources</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {property.sourceListings.length > 0 ? (
-                    property.sourceListings.map((src) => (
-                      <div
-                        key={src.id}
-                        className="flex items-center justify-between rounded-lg border p-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium capitalize">{src.source}</p>
-                          {src.agentName && (
-                            <p className="text-xs text-muted-foreground">Agent: {src.agentName}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            <Calendar className="mr-1 inline h-3 w-3" />
-                            Scraped: {src.scrapedAt.toLocaleDateString()}
-                          </p>
-                        </div>
-                        {src.sourceUrl && (
-                          <a href={src.sourceUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm">
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          </a>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No external sources available.</p>
-                  )}
-                </CardContent>
-              </Card>
+              <SourcesTab
+                sourceListings={property.sourceListings.map((src) => ({
+                  ...src,
+                  rawData: src.rawData as Record<string, unknown>,
+                }))}
+                monthlyRent={property.monthlyRent}
+                title={property.title}
+              />
             </TabsContent>
           </Tabs>
+
+          {/* Location Map */}
+          {property.latitude != null && property.longitude != null && (
+            <LocationMap
+              latitude={property.latitude}
+              longitude={property.longitude}
+              address={property.address}
+              district={property.district}
+              mtrStation={property.mtrStation}
+              mtrProximity={property.mtrProximity}
+            />
+          )}
+
+          {/* Similar Properties */}
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">Similar Properties</h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-64 animate-pulse rounded-xl bg-muted" />
+                  ))}
+                </div>
+              </div>
+            }
+          >
+            <SimilarProperties
+              currentPropertyId={property.id}
+              district={property.district}
+              propertyType={property.propertyType}
+              monthlyRent={property.monthlyRent}
+            />
+          </Suspense>
         </div>
 
         {/* ─── Sidebar ─── */}
@@ -608,53 +427,26 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
               <ShortlistButton propertyId={property.id} />
 
-              <Button variant="outline" className="w-full">
-                <Share2 className="mr-2 h-4 w-4" />
-                Share Listing
-              </Button>
+              <ShareButton title={property.title} propertyId={property.id} />
+
+              <ScheduleViewing
+                propertyTitle={property.title}
+                agentName={property.agentName}
+              />
 
               <Separator />
 
-              {/* Agent Contact */}
-              {property.agentName && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <User className="h-4 w-4 text-primary" />
-                    Agent Contact
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <p className="font-medium">{property.agentName}</p>
-                    {property.agentCompany && (
-                      <p className="flex items-center gap-2 text-muted-foreground">
-                        <Briefcase className="h-3.5 w-3.5" />
-                        {property.agentCompany}
-                      </p>
-                    )}
-                    {property.agentPhone && (
-                      <p className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5" />
-                        {property.agentPhone}
-                      </p>
-                    )}
-                    {property.agentEmail && (
-                      <p className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5" />
-                        {property.agentEmail}
-                      </p>
-                    )}
-                  </div>
-                  {property.agentPhone && (
-                    <a href={`tel:${property.agentPhone}`}>
-                      <Button className="w-full" size="sm">
-                        <Phone className="mr-2 h-4 w-4" />
-                        Contact Agent
-                      </Button>
-                    </a>
-                  )}
-                </div>
-              )}
+              {/* Agent Contact with Enquiry Form */}
+              <ContactDialog
+                agentName={property.agentName}
+                agentCompany={property.agentCompany}
+                agentPhone={property.agentPhone}
+                agentEmail={property.agentEmail}
+                propertyTitle={property.title}
+                propertyId={property.id}
+              />
 
-              {(property.agentName) && <Separator />}
+              {property.agentName && <Separator />}
 
               {/* AI Score */}
               {property.aiScore != null && (
@@ -748,45 +540,6 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 }
 
 /* ─── Helper Components ─── */
-
-function DetailItem({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div>
-      <p className="text-muted-foreground flex items-center gap-1">
-        {icon}
-        {label}
-      </p>
-      <p className="font-medium">{value}</p>
-    </div>
-  );
-}
-
-function CostLine({
-  label,
-  amount,
-  bold,
-}: {
-  label: string;
-  amount: number | null | undefined;
-  bold?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className={bold ? "font-semibold" : "text-muted-foreground"}>{label}</span>
-      <span className={bold ? "font-bold text-primary text-base" : "font-medium"}>
-        {amount != null ? formatCurrency(amount) : "—"}
-      </span>
-    </div>
-  );
-}
 
 function AiScoreCircle({ score, size = "md" }: { score: number; size?: "sm" | "md" }) {
   const radius = size === "sm" ? 20 : 28;

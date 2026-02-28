@@ -156,11 +156,15 @@ export class MidlandIciScraper extends BaseScraper {
           const phoneEl = container.querySelector('a[href^="tel:"]');
           const agentPhone = phoneEl?.textContent?.trim() || "";
 
-          const imgElements = Array.from(container.querySelectorAll("img[src]"));
+          const imgElements = Array.from(container.querySelectorAll("img"));
           const images: string[] = [];
           for (const img of imgElements) {
-            const src = (img as HTMLImageElement).src;
-            if (src && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon")) {
+            const el = img as HTMLImageElement;
+            const src = el.getAttribute("data-src")
+              || el.getAttribute("data-original")
+              || el.getAttribute("data-lazy-src")
+              || el.src;
+            if (src && src.startsWith("http") && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon") && !src.includes("placeholder") && !src.includes("no-photo")) {
               images.push(src);
             }
           }
