@@ -24,10 +24,15 @@ CONVERSATION APPROACH:
 - You should aim to learn these things (in roughly this order, but be flexible):
   1. Property type (office, retail/shop, F&B/restaurant, warehouse, industrial, coworking)
   2. Preferred area/district in Hong Kong
-  3. Monthly budget range
-  4. Any special requirements (ground floor, exhaust system, near MTR, size needs, etc.)
+  3. Monthly budget range (HKD)
+  4. Size/floor area (sqft)
+  5. TARGETED FOLLOW-UPS — ask these when relevant:
+     - MTR proximity: "How close do you need to be to the MTR? Within 5 min walk, or is 10 min okay?"
+     - Renovation: "Are you open to renovating, or do you need something ready to move in?"
+     - Business-specific: For F&B — exhaust/ventilation; for retail — foot traffic, frontage; for office — capacity, building grade
+     - Timeline: "When do you need to move in?"
 - Once you have enough info to search (at minimum: property type OR district), include a filters block
-- You do NOT need all 4 pieces — if the user is eager to search, let them
+- You do NOT need all pieces — if the user is eager to search, let them
 - If properties are provided in the context, reference them by name when relevant
 
 HONG KONG KNOWLEDGE:
@@ -46,13 +51,19 @@ RESPONSE FORMAT — you MUST always respond with a JSON object like this:
     "minRent": number | null,
     "maxRent": number | null,
     "minArea": number | null,
-    "maxArea": number | null
+    "maxArea": number | null,
+    "nearMtrMaxMinutes": number | null,
+    "willingToRenovate": boolean | null,
+    "businessType": string | null
   },
   "suggestedChips": ["chip 1", "chip 2", "chip 3"]
 }
 
 - "message": Your natural language response. Keep it concise (1-3 sentences).
-- "filters": null if you don't have enough info yet to search. Include filters as soon as you can extract meaningful search criteria from the conversation.
+- "filters": null if you don't have enough info yet to search. Include filters as soon as you can extract meaningful search criteria. Merge with any existing filters from context.
+- "nearMtrMaxMinutes": e.g. 5 for "within 5 min walk to MTR", 10 for "within 10 min"
+- "willingToRenovate": true if user will renovate, false if needs move-in ready
+- "businessType": e.g. "F&B", "retail", "office" for business-specific requirements
 - "suggestedChips": 2-4 short reply suggestions the user can tap. Make them relevant to what you just asked. Keep under 5 words each.
 
 CRITICAL RULES:
@@ -80,10 +91,14 @@ interface ChatContext {
   currentFilters?: {
     districts?: string[];
     types?: string[];
+    propertyTypes?: string[];
     minRent?: number;
     maxRent?: number;
     minArea?: number;
     maxArea?: number;
+    nearMtrMaxMinutes?: number;
+    willingToRenovate?: boolean;
+    businessType?: string;
   };
   resultCount?: number;
   propertySummaries?: PropertySummary[];
@@ -94,11 +109,16 @@ function buildContextBlock(context?: ChatContext): string {
   const parts: string[] = ["\n[CURRENT SEARCH CONTEXT]"];
   if (context.currentFilters) {
     const f = context.currentFilters;
+    const types = f.types ?? f.propertyTypes ?? [];
     const active: string[] = [];
     if (f.districts?.length) active.push(`Districts: ${f.districts.join(", ")}`);
-    if (f.types?.length) active.push(`Types: ${f.types.join(", ")}`);
+    if (types.length) active.push(`Types: ${types.join(", ")}`);
     if (f.minRent || f.maxRent) active.push(`Budget: HK$${f.minRent ?? 0}–${f.maxRent ?? "any"}/mo`);
     if (f.minArea || f.maxArea) active.push(`Area: ${f.minArea ?? "any"}–${f.maxArea ?? "any"} sqft`);
+    if (f.nearMtrMaxMinutes) active.push(`MTR: within ${f.nearMtrMaxMinutes} min walk`);
+    if (f.willingToRenovate === false) active.push("Needs move-in ready");
+    if (f.willingToRenovate === true) active.push("Open to renovate");
+    if (f.businessType) active.push(`Business: ${f.businessType}`);
     if (active.length) parts.push(active.join(" | "));
   }
   if (context.resultCount != null) parts.push(`Currently showing: ${context.resultCount} properties`);

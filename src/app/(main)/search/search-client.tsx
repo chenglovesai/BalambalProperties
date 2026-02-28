@@ -41,6 +41,7 @@ interface PropertyData {
   aiScore: number | null;
   buildingGrade: string | null;
   sourceCount: number;
+  suitabilityScore?: number;
 }
 
 interface SearchPageClientProps {
@@ -50,6 +51,7 @@ interface SearchPageClientProps {
   totalPages: number;
   params: Record<string, string | undefined>;
   hasAnyFilter: boolean;
+  isShortlist?: boolean;
 }
 
 const QUICK_SEARCHES = [
@@ -86,9 +88,21 @@ export function SearchPageClient({
   totalPages,
   params,
   hasAnyFilter,
+  isShortlist = false,
 }: SearchPageClientProps) {
   const router = useRouter();
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(!!params.openFilters);
+  const [aiOpen, setAiOpen] = useState(false);
+  const panelOpen = filterOpen || aiOpen;
+  const setPanelOpen = (open: boolean) => {
+    if (!open) {
+      setFilterOpen(false);
+      setAiOpen(false);
+    } else {
+      setFilterOpen(true);
+      setAiOpen(false);
+    }
+  };
   const [whatIfExpanded, setWhatIfExpanded] = useState(false);
 
   // Filter state
@@ -123,6 +137,7 @@ export function SearchPageClient({
   }, [chatMessages]);
 
   const [filtersSentToAi, setFiltersSentToAi] = useState(false);
+  const initialFilterMessageRef = useRef<string | null>(null);
 
   async function handleSendToAi() {
     const parts: string[] = [];
@@ -161,6 +176,7 @@ export function SearchPageClient({
       };
 
       const openingMsg = `The user has selected these filters:\n${filterSummary}\n\nBased on these preferences, greet them briefly and ask 1-2 clarifying questions to help refine the search.`;
+      initialFilterMessageRef.current = openingMsg;
 
       const res = await fetch("/api/ai/chat", {
         method: "POST",
@@ -172,11 +188,46 @@ export function SearchPageClient({
         const data = await res.json();
         setChatMessages([{ role: "assistant", content: data.message }]);
         if (data.suggestedChips?.length) setSuggestedChips(data.suggestedChips);
+        if (data.filters) {
+          const sp = new URLSearchParams();
+          if (data.filters.districts?.length) sp.set("districts", data.filters.districts.join(","));
+          if (data.filters.propertyTypes?.length) sp.set("types", data.filters.propertyTypes.join(","));
+          if (data.filters.minRent) sp.set("minRent", String(data.filters.minRent));
+          if (data.filters.maxRent) sp.set("maxRent", String(data.filters.maxRent));
+          if (data.filters.minArea) sp.set("minArea", String(data.filters.minArea));
+          if (data.filters.maxArea) sp.set("maxArea", String(data.filters.maxArea));
+          setLastQuery(sp.toString());
+        } else {
+          const sp = new URLSearchParams();
+          if (location) sp.set("districts", location);
+          if (types.length) sp.set("types", types.join(","));
+          if (minPrice) sp.set("minRent", minPrice);
+          if (maxPrice) sp.set("maxRent", maxPrice);
+          if (minArea) sp.set("minArea", minArea);
+          if (maxArea) sp.set("maxArea", maxArea);
+          setLastQuery(sp.toString());
+        }
       } else {
         setChatMessages([{ role: "assistant", content: `Got it! I see you're looking for${types.length ? ` ${types.join("/")}` : ""} space${location ? ` in ${location}` : ""}. Any specific requirements I should know about?` }]);
+        const sp = new URLSearchParams();
+        if (location) sp.set("districts", location);
+        if (types.length) sp.set("types", types.join(","));
+        if (minPrice) sp.set("minRent", minPrice);
+        if (maxPrice) sp.set("maxRent", maxPrice);
+        if (minArea) sp.set("minArea", minArea);
+        if (maxArea) sp.set("maxArea", maxArea);
+        setLastQuery(sp.toString());
       }
     } catch {
       setChatMessages([{ role: "assistant", content: "I received your filters. What else can you tell me about your ideal space?" }]);
+      const sp = new URLSearchParams();
+      if (location) sp.set("districts", location);
+      if (types.length) sp.set("types", types.join(","));
+      if (minPrice) sp.set("minRent", minPrice);
+      if (maxPrice) sp.set("maxRent", maxPrice);
+      if (minArea) sp.set("minArea", minArea);
+      if (maxArea) sp.set("maxArea", maxArea);
+      setLastQuery(sp.toString());
     } finally {
       setChatLoading(false);
     }
@@ -228,6 +279,7 @@ export function SearchPageClient({
     setSuggestedChips([]);
     setLastQuery("");
     setFiltersSentToAi(false);
+    initialFilterMessageRef.current = null;
   }
 
   function handleQuickSearch(q: { districts: string; types: string }) {
@@ -275,22 +327,29 @@ export function SearchPageClient({
     setChatInput("");
     setSuggestedChips([]);
 
+    const baseMessages = initialFilterMessageRef.current
+      ? [
+          { role: "user" as const, content: initialFilterMessageRef.current },
+          ...chatMessages,
+        ]
+      : [...chatMessages];
     const updatedMessages: { role: "user" | "assistant"; content: string }[] = [
-      ...chatMessages,
+      ...baseMessages,
       { role: "user" as const, content: msg },
     ];
     setChatMessages(updatedMessages);
     setChatLoading(true);
 
     try {
+      const districts = location ? location.split(",").map((d) => d.trim()).filter(Boolean) : [];
       const context = {
         currentFilters: {
-          districts: currentDistricts,
-          types: currentTypes,
-          minRent: params.minRent ? Number(params.minRent) : undefined,
-          maxRent: params.maxRent ? Number(params.maxRent) : undefined,
-          minArea: params.minArea ? Number(params.minArea) : undefined,
-          maxArea: params.maxArea ? Number(params.maxArea) : undefined,
+          districts: districts.length ? districts : currentDistricts,
+          types: types.length ? types : currentTypes,
+          minRent: minPrice ? Number(minPrice) : (params.minRent ? Number(params.minRent) : undefined),
+          maxRent: maxPrice ? Number(maxPrice) : (params.maxRent ? Number(params.maxRent) : undefined),
+          minArea: minArea ? Number(minArea) : (params.minArea ? Number(params.minArea) : undefined),
+          maxArea: maxArea ? Number(maxArea) : (params.maxArea ? Number(params.maxArea) : undefined),
         },
         resultCount: total,
         propertySummaries: properties.slice(0, 10).map((p) => ({
@@ -525,6 +584,31 @@ export function SearchPageClient({
         </div>
       )}
 
+      {/* ─── Shortlist Header ─── */}
+      {isShortlist && properties.length > 0 && (
+        <div className="border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-violet-50">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-indigo-600" />
+                  Your Shortlist
+                </h2>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  Top {properties.length} matches ranked by suitability
+                </p>
+              </div>
+              <Link
+                href="/search?mode=guided"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Refine with AI →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Property Grid ─── */}
       {properties.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center px-4">
@@ -570,10 +654,10 @@ export function SearchPageClient({
                   sourceCount={property.sourceCount}
                 />
                 <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-[1] pointer-events-none">
-                  {property.aiScore != null && (
+                  {(property.suitabilityScore != null || property.aiScore != null) && (
                     <span className="flex items-center gap-1 rounded-full bg-black/80 px-2 py-0.5 text-xs font-medium text-amber-400 backdrop-blur">
                       <Sparkles className="h-3 w-3" />
-                      {property.aiScore}/100
+                      {property.suitabilityScore ?? property.aiScore}/100
                     </span>
                   )}
                   {property.buildingGrade && (
@@ -587,7 +671,7 @@ export function SearchPageClient({
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {totalPages > 1 && !isShortlist && (
             <div className="mt-8 flex items-center justify-center gap-2">
               {page > 1 && (
                 <Link
@@ -816,8 +900,19 @@ export function SearchPageClient({
                   <p className="mt-1 max-w-[260px] text-xs text-gray-400">
                     {filtersSentToAi
                       ? "Starting AI advisor..."
-                      : "Select your filters on the left, then click \"Send to AI\" to get personalised recommendations."}
+                      : "Select filters and click \"Send to AI\", or start chatting to describe what you need."}
                   </p>
+                  {!filtersSentToAi && (
+                    <button
+                      type="button"
+                      onClick={handleSendToAi}
+                      disabled={chatLoading}
+                      className="mt-4 flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {chatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                      Start chatting
+                    </button>
+                  )}
                 </div>
               )}
 

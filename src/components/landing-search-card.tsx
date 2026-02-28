@@ -43,6 +43,7 @@ export function LandingSearchCard() {
 
   const handleSearch = () => {
     const params = new URLSearchParams();
+    params.set("mode", "guided");
     if (activeTab !== "rent") params.set("type", activeTab);
     if (query.trim()) params.set("q", query.trim());
     router.push(`/search?${params.toString()}`);
@@ -86,6 +87,7 @@ export function LandingSearchCard() {
       }
 
       const p = new URLSearchParams();
+      p.set("mode", "guided");
       const keywords = extractSearchKeywords(data.description ?? "", data.filters);
       if (keywords.trim()) p.set("q", keywords.trim());
       if (data.filters?.districts?.length)
