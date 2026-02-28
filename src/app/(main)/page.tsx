@@ -107,7 +107,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <>
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-white">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50 via-white to-white" />
@@ -394,6 +394,6 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
-    </div>
+    </>
   );
 }

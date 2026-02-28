@@ -120,4 +120,68 @@ export abstract class BaseScraper {
     this.errors.push({ url, message, timestamp: new Date() });
     this.log.error(`${url}: ${message}`);
   }
+
+  protected normalizeImageUrls(urls: string[]): string[] {
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+
+    for (const rawUrl of urls) {
+      const url = this.normalizeImageUrl(rawUrl);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      normalized.push(url);
+    }
+
+    return normalized;
+  }
+
+  protected normalizeImageUrl(rawUrl: string | undefined | null): string | null {
+    if (!rawUrl) return null;
+    const trimmed = rawUrl.trim();
+    if (!trimmed.startsWith("http")) return null;
+
+    try {
+      const parsed = new URL(trimmed);
+      const host = parsed.hostname.toLowerCase();
+
+      // Drop common resizing/cropping query params to prefer original images.
+      const removableParams = [
+        "w",
+        "h",
+        "width",
+        "height",
+        "q",
+        "quality",
+        "fit",
+        "crop",
+        "auto",
+        "dpr",
+        "fm",
+        "format",
+      ];
+      for (const key of removableParams) {
+        parsed.searchParams.delete(key);
+      }
+
+      const sizeValue = parsed.searchParams.get("size");
+      if (sizeValue && /thumb|small|medium/i.test(sizeValue)) {
+        parsed.searchParams.delete("size");
+      }
+
+      // Known thumbnail markers in paths.
+      parsed.pathname = parsed.pathname
+        .replace(/\/thumb\//gi, "/")
+        .replace(/\/thumbnail\//gi, "/")
+        .replace(/([_-])(thumb|thumbnail)(?=[._-])/gi, "$1");
+
+      // Unsplash seeded images often carry width constraints in query params.
+      if (host.includes("images.unsplash.com")) {
+        parsed.searchParams.delete("w");
+      }
+
+      return parsed.toString();
+    } catch {
+      return trimmed;
+    }
+  }
 }

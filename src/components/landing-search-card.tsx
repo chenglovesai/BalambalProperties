@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Camera, Search, ChevronDown } from "lucide-react";
+import { MapPin, Camera, Search, ChevronDown, Loader2, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,28 @@ const LOCATIONS = [
   "Kwun Tong", "Kwai Chung", "Sheung Wan", "North Point", "All Hong Kong",
 ];
 
+function extractSearchKeywords(
+  description: string,
+  filters?: { propertyTypes?: string[]; districts?: string[] }
+): string {
+  const terms: string[] = [];
+  if (filters?.propertyTypes?.length) {
+    terms.push(...filters.propertyTypes);
+  }
+  // Extract common property terms from description that match listings
+  const keywords = [
+    "office", "retail", "cafe", "coworking", "industrial", "warehouse",
+    "open plan", "open-plan", "natural light", "modern", "minimalist",
+    "exposed", "renovated", "ground floor", "shop", "restaurant",
+    "fnb", "studio", "creative", "design",
+  ];
+  const lower = (description || "").toLowerCase();
+  for (const kw of keywords) {
+    if (lower.includes(kw) && !terms.includes(kw)) terms.push(kw);
+  }
+  return terms.slice(0, 5).join(" ").trim() || "";
+}
+
 export function LandingSearchCard() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,6 +50,9 @@ export function LandingSearchCard() {
   const [priceRange, setPriceRange] = useState([20000, 100000]);
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const [capacityDropdownOpen, setCapacityDropdownOpen] = useState(false);
+  const [vibeLoading, setVibeLoading] = useState(false);
+  const [vibePreview, setVibePreview] = useState<string | null>(null);
+  const [vibeError, setVibeError] = useState<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -50,6 +75,68 @@ export function LandingSearchCard() {
     params.set("minRent", String(priceRange[0]));
     params.set("maxRent", String(priceRange[1]));
     router.push(`/search?${params.toString()}`);
+  };
+
+  const handleVibeImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setVibeError("Please upload an image (JPEG, PNG, etc.)");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setVibeError("Image must be under 10MB");
+      return;
+    }
+
+    setVibeError(null);
+    setVibeLoading(true);
+    setVibePreview(URL.createObjectURL(file));
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch("/api/ai/image-search", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setVibeError(data.error || "Failed to analyze image");
+        return;
+      }
+
+      const p = new URLSearchParams();
+      // Use short keywords for text search - full AI description would never match listings
+      const keywords = extractSearchKeywords(data.description ?? "", data.filters);
+      if (keywords.trim()) p.set("q", keywords.trim());
+      if (data.filters?.districts?.length)
+        p.set("districts", data.filters.districts.join(","));
+      if (data.filters?.propertyTypes?.length)
+        p.set("types", data.filters.propertyTypes.join(","));
+      if (data.filters?.minRent) p.set("minRent", String(data.filters.minRent));
+      if (data.filters?.maxRent) p.set("maxRent", String(data.filters.maxRent));
+      if (data.filters?.minArea) p.set("minArea", String(data.filters.minArea));
+      if (data.filters?.maxArea) p.set("maxArea", String(data.filters.maxArea));
+
+      router.push(`/search?${p.toString()}`);
+    } catch {
+      setVibeError("Connection error. Try again.");
+    } finally {
+      setVibeLoading(false);
+      e.target.value = "";
+    }
+  };
+
+  const clearVibePreview = () => {
+    if (vibePreview) URL.revokeObjectURL(vibePreview);
+    setVibePreview(null);
+    setVibeError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -92,28 +179,72 @@ export function LandingSearchCard() {
         </div>
       </div>
 
-      {/* Image Upload */}
+      {/* Vibe Image / Mood Board Upload */}
       <div className="mt-4">
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           className="hidden"
-          onChange={() => {}}
+          onChange={handleVibeImageChange}
+          disabled={vibeLoading}
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 py-10 transition-colors hover:border-[#1e1b4b] hover:bg-gray-100"
-        >
-          <Camera className="h-10 w-10 text-gray-400" />
-          <span className="mt-2 text-sm font-medium text-black">
-            Upload Inspiration or &quot;Vibe&quot; Image
-          </span>
-          <span className="mt-0.5 text-xs text-gray-500">
-            Search by photo, floor plan, or sketch
-          </span>
-        </button>
+        {vibePreview ? (
+          <div className="relative rounded-lg border-2 border-[#1e1b4b] overflow-hidden bg-gray-100">
+            <img
+              src={vibePreview}
+              alt="Vibe preview"
+              className="h-32 w-full object-cover"
+            />
+            {vibeLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+                <span className="ml-2 text-sm text-white">Finding similar spaces...</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={clearVibePreview}
+                className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                aria-label="Remove image"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={vibeLoading}
+            className={cn(
+              "flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed py-10 transition-colors",
+              vibeLoading
+                ? "cursor-wait border-gray-200 bg-gray-50"
+                : "border-gray-200 bg-gray-50 hover:border-[#1e1b4b] hover:bg-gray-100"
+            )}
+          >
+            {vibeLoading ? (
+              <>
+                <Loader2 className="h-10 w-10 animate-spin text-[#1e1b4b]" />
+                <span className="mt-2 text-sm font-medium text-black">Analyzing your vibe...</span>
+              </>
+            ) : (
+              <>
+                <Camera className="h-10 w-10 text-gray-400" />
+                <span className="mt-2 text-sm font-medium text-black">
+                  Upload Vibe Board or Inspiration Image
+                </span>
+                <span className="mt-0.5 text-xs text-gray-500">
+                  Photo, floor plan, or mood board — we&apos;ll find similar spaces
+                </span>
+              </>
+            )}
+          </button>
+        )}
+        {vibeError && (
+          <p className="mt-2 text-xs text-red-600">{vibeError}</p>
+        )}
       </div>
 
       {/* Dropdowns */}
