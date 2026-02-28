@@ -9,11 +9,12 @@ export async function GET(req: NextRequest) {
   try {
     const properties = await prisma.property.findMany({
       where: { status: "active" },
-      orderBy: { engagementScore: "desc" },
+      orderBy: { updatedAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
       include: {
         evidencePack: true,
+        _count: { select: { sourceListings: true } },
       },
     });
 

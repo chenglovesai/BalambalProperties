@@ -45,21 +45,37 @@ export async function GET(req: NextRequest) {
     }
 
     if (params.minArea || params.maxArea) {
-      where.saleableArea = {};
-      if (params.minArea) where.saleableArea.gte = params.minArea;
-      if (params.maxArea) where.saleableArea.lte = params.maxArea;
-    }
+      const areaFilter: Prisma.FloatNullableFilter = {};
+      if (params.minArea) areaFilter.gte = params.minArea;
+      if (params.maxArea) areaFilter.lte = params.maxArea;
 
-    if (params.query) {
-      where.OR = [
-        { title: { contains: params.query, mode: "insensitive" } },
-        { description: { contains: params.query, mode: "insensitive" } },
-        { district: { contains: params.query, mode: "insensitive" } },
-        { address: { contains: params.query, mode: "insensitive" } },
+      where.AND = [
+        ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
+        {
+          OR: [
+            { saleableArea: areaFilter },
+            { grossArea: areaFilter },
+          ],
+        },
       ];
     }
 
-    let orderBy: Prisma.PropertyOrderByWithRelationInput = { engagementScore: "desc" };
+    if (params.query) {
+      where.AND = [
+        ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
+        {
+          OR: [
+            { title: { contains: params.query, mode: "insensitive" } },
+            { description: { contains: params.query, mode: "insensitive" } },
+            { district: { contains: params.query, mode: "insensitive" } },
+            { address: { contains: params.query, mode: "insensitive" } },
+            { buildingName: { contains: params.query, mode: "insensitive" } },
+          ],
+        },
+      ];
+    }
+
+    let orderBy: Prisma.PropertyOrderByWithRelationInput = { updatedAt: "desc" };
     switch (params.sort) {
       case "price_asc":
         orderBy = { monthlyRent: "asc" };
@@ -87,7 +103,10 @@ export async function GET(req: NextRequest) {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: { evidencePack: true },
+        include: {
+          evidencePack: true,
+          _count: { select: { sourceListings: true } },
+        },
       }),
       prisma.property.count({ where }),
     ]);

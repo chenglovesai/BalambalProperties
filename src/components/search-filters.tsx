@@ -14,10 +14,11 @@ import { cn } from "@/lib/utils";
 
 const QUICK_SEARCHES = [
   { label: "Offices in Central", districts: "Central", types: "office" },
-  { label: "F&B in Causeway Bay", districts: "Causeway Bay", types: "fnb" },
-  { label: "Warehouse under $20K", types: "warehouse", maxRent: "20000" },
+  { label: "Shops in Causeway Bay", districts: "Causeway Bay", types: "retail" },
+  { label: "Industrial in Kwun Tong", districts: "Kwun Tong", types: "industrial" },
+  { label: "Offices in Wan Chai", districts: "Wan Chai", types: "office" },
   { label: "Retail in TST", districts: "Tsim Sha Tsui", types: "retail" },
-  { label: "Coworking in Wan Chai", districts: "Wan Chai", types: "coworking" },
+  { label: "All Properties", districts: "", types: "" },
 ];
 
 const LISTING_TYPES = ["Buy", "Rent", "Mortgage"];
@@ -71,7 +72,6 @@ export function SearchFilters() {
     const params = new URLSearchParams();
     if (q.districts) params.set("districts", q.districts);
     if (q.types) params.set("types", q.types);
-    if (q.maxRent) params.set("maxRent", q.maxRent);
     params.set("view", "results");
     router.push(`/search?${params.toString()}`);
   }

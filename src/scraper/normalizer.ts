@@ -25,11 +25,17 @@ export interface NormalizedProperty {
   latitude: number | null;
   longitude: number | null;
   features: Record<string, unknown> | null;
+  buildingName: string | null;
+  mtrProximity: string | null;
+  mtrStation: string | null;
+  hasExhaust: boolean;
+  loadingAccess: boolean;
   source: string;
   sourceUrl: string | null;
   rawData: Record<string, unknown>;
   agentName: string | null;
   agentContact: string | null;
+  agentCompany: string | null;
 }
 
 export function normalizeDistrict(raw: string | undefined): string {
@@ -96,6 +102,11 @@ export function normalizeListing(raw: RawListing): NormalizedProperty {
     || buildDescription(raw, district, propertyType)
     || `${propertyType} property in ${district}`;
 
+  const mtrProximity = raw.features.mtrProximity as string | undefined;
+  const mtrMatch = mtrProximity?.match(/(\d+)\s*min\s*-\s*(.+)/i);
+  const hasExhaust = !!(raw.features.exhaustSystem || raw.features.exhaustDuct || raw.features.basicExhaust || raw.features.exhaust_system);
+  const loadingAccess = !!(raw.features.loadingAccess || raw.features.loadingDock || raw.features.loading_dock || raw.features.loading_access);
+
   return {
     canonicalId,
     title: raw.title || `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} in ${district}`,
@@ -117,11 +128,17 @@ export function normalizeListing(raw: RawListing): NormalizedProperty {
     latitude: null,
     longitude: null,
     features: Object.keys(raw.features).length > 0 ? raw.features : null,
+    buildingName: raw.buildingName || null,
+    mtrProximity: mtrMatch ? `${mtrMatch[1]} min walk` : (raw.features.mtrNearby ? "Near MTR" : null),
+    mtrStation: mtrMatch?.[2]?.replace(/\s*Station\s*/i, "").trim() || null,
+    hasExhaust,
+    loadingAccess,
     source: raw.source,
     sourceUrl: raw.sourceUrl || null,
     rawData: raw.rawData,
     agentName: raw.agentName || null,
     agentContact: raw.agentContact || null,
+    agentCompany: raw.agentCompany || null,
   };
 }
 

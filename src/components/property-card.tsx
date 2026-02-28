@@ -5,6 +5,7 @@ import {
   Building,
   TrendingUp,
   ShieldCheck,
+  Globe,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +19,13 @@ interface PropertyCardProps {
   propertyType: string;
   monthlyRent: number | null;
   saleableArea: number | null;
+  grossArea?: number | null;
+  price?: number | null;
   images: string[];
   verificationScore: number;
   engagementScore: number;
   floor: string | null;
+  sourceCount?: number;
 }
 
 const typeLabels: Record<string, string> = {
@@ -40,12 +44,18 @@ export function PropertyCard({
   propertyType,
   monthlyRent,
   saleableArea,
+  grossArea,
+  price,
   images,
   verificationScore,
   engagementScore,
+  sourceCount,
 }: PropertyCardProps) {
   const imageUrl = images[0] || "/placeholder-property.svg";
   const isHot = engagementScore > 50;
+  const displayArea = saleableArea || grossArea;
+  const hasRent = monthlyRent != null && monthlyRent > 0;
+  const hasSalePrice = price != null && price > 0;
 
   return (
     <Link href={`/property/${id}`}>
@@ -67,8 +77,8 @@ export function PropertyCard({
               </Badge>
             )}
           </div>
-          {verificationScore > 0 && (
-            <div className="absolute right-3 top-3">
+          <div className="absolute right-3 top-3 flex flex-col gap-1.5">
+            {verificationScore > 0 && (
               <Badge
                 variant={verificationScore >= 60 ? "success" : "warning"}
                 className="backdrop-blur-sm"
@@ -76,8 +86,14 @@ export function PropertyCard({
                 <ShieldCheck className="mr-1 h-3 w-3" />
                 {verificationScore}%
               </Badge>
-            </div>
-          )}
+            )}
+            {sourceCount != null && sourceCount > 1 && (
+              <Badge variant="outline" className="backdrop-blur-sm bg-white/90 text-xs">
+                <Globe className="mr-1 h-3 w-3" />
+                {sourceCount} sources
+              </Badge>
+            )}
+          </div>
         </div>
         <CardContent className="p-4">
           <h3 className="font-semibold leading-tight line-clamp-1 group-hover:text-primary transition-colors">
@@ -89,18 +105,25 @@ export function PropertyCard({
           </div>
           <div className="mt-3 flex items-center justify-between">
             <div>
-              {monthlyRent && (
+              {hasRent ? (
                 <p className="text-lg font-bold text-primary">
-                  {formatCurrency(monthlyRent)}
+                  {formatCurrency(monthlyRent!)}
                   <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </p>
+              ) : hasSalePrice ? (
+                <p className="text-lg font-bold text-primary">
+                  {formatCurrency(price!)}
+                  <span className="text-sm font-normal text-muted-foreground"> sale</span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Price on enquiry</p>
               )}
             </div>
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              {saleableArea && (
+              {displayArea != null && (
                 <span className="flex items-center gap-1">
                   <Ruler className="h-3.5 w-3.5" />
-                  {formatArea(saleableArea)}
+                  {formatArea(displayArea)}
                 </span>
               )}
               <span className="flex items-center gap-1">

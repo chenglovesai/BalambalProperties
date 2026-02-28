@@ -11,10 +11,10 @@
     "db:seed": "tsx src/scripts/seed.ts",
     "db:reset": "prisma db push --force-reset && tsx src/scripts/seed.ts",
     "postinstall": "prisma generate",
-    "scraper": "tsx src/scraper/index.ts",
-    "scraper:once": "tsx src/scraper/index.ts --once",
-    "scraper:full": "tsx src/scraper/index.ts --once --full",
-    "scraper:schedule": "tsx src/scraper/index.ts"
+    "scraper": "PLAYWRIGHT_BROWSERS_PATH=0 tsx src/scraper/index.ts",
+    "scraper:once": "PLAYWRIGHT_BROWSERS_PATH=0 tsx src/scraper/index.ts --once",
+    "scraper:full": "PLAYWRIGHT_BROWSERS_PATH=0 tsx src/scraper/index.ts --once --full",
+    "scraper:schedule": "PLAYWRIGHT_BROWSERS_PATH=0 tsx src/scraper/index.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

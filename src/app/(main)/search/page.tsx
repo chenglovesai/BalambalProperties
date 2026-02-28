@@ -32,7 +32,14 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
   const where: Prisma.PropertyWhereInput = { status: "active" };
 
   if (params.districts) {
-    where.district = { in: params.districts.split(",").filter(Boolean) };
+    const districts = params.districts.split(",").filter(Boolean);
+    if (districts.length === 1) {
+      where.district = { contains: districts[0], mode: "insensitive" };
+    } else {
+      where.OR = districts.map((d) => ({
+        district: { contains: d, mode: "insensitive" as const },
+      }));
+    }
   }
 
   if (params.types) {
@@ -46,21 +53,37 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
   }
 
   if (params.minArea || params.maxArea) {
-    where.saleableArea = {};
-    if (params.minArea) where.saleableArea.gte = Number(params.minArea);
-    if (params.maxArea) where.saleableArea.lte = Number(params.maxArea);
-  }
+    const areaFilter: Prisma.FloatNullableFilter = {};
+    if (params.minArea) areaFilter.gte = Number(params.minArea);
+    if (params.maxArea) areaFilter.lte = Number(params.maxArea);
 
-  if (params.q && !params.districts && !params.types) {
-    where.OR = [
-      { title: { contains: params.q, mode: "insensitive" } },
-      { description: { contains: params.q, mode: "insensitive" } },
-      { district: { contains: params.q, mode: "insensitive" } },
-      { address: { contains: params.q, mode: "insensitive" } },
+    where.AND = [
+      ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
+      {
+        OR: [
+          { saleableArea: areaFilter },
+          { grossArea: areaFilter },
+        ],
+      },
     ];
   }
 
-  let orderBy: Prisma.PropertyOrderByWithRelationInput = { aiScore: "desc" };
+  if (params.q && !params.districts && !params.types) {
+    where.AND = [
+      ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
+      {
+        OR: [
+          { title: { contains: params.q, mode: "insensitive" } },
+          { description: { contains: params.q, mode: "insensitive" } },
+          { district: { contains: params.q, mode: "insensitive" } },
+          { address: { contains: params.q, mode: "insensitive" } },
+          { buildingName: { contains: params.q, mode: "insensitive" } },
+        ],
+      },
+    ];
+  }
+
+  let orderBy: Prisma.PropertyOrderByWithRelationInput = { updatedAt: "desc" };
   switch (params.sort) {
     case "price_asc":
       orderBy = { monthlyRent: "asc" };
@@ -78,12 +101,12 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
       orderBy = { createdAt: "desc" };
       break;
     case "score":
-      orderBy = { aiScore: "desc" };
+      orderBy = { engagementScore: "desc" };
       break;
   }
 
   const page = Math.max(1, Number(params.page) || 1);
-  const limit = 12;
+  const limit = 24;
 
   try {
     const [properties, total] = await Promise.all([
@@ -92,18 +115,22 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
+        include: {
+          _count: { select: { sourceListings: true } },
+        },
       }),
       prisma.property.count({ where }),
     ]);
 
     return { properties, total, page, limit };
   } catch {
-    return { properties: [], total: 0, page: 1, limit: 12 };
+    return { properties: [], total: 0, page: 1, limit: 24 };
   }
 }
 
 async function ResultsView({ params }: { params: Awaited<SearchPageProps["searchParams"]> }) {
-  const { properties, total } = await searchProperties(params);
+  const { properties, total, page, limit } = await searchProperties(params);
+  const totalPages = Math.ceil(total / limit);
 
   const gradeColor: Record<string, string> = {
     A: "bg-emerald-100 text-emerald-700",
@@ -209,14 +236,17 @@ async function ResultsView({ params }: { params: Awaited<SearchPageProps["search
                   propertyType={property.propertyType}
                   monthlyRent={property.monthlyRent}
                   saleableArea={property.saleableArea}
+                  grossArea={property.grossArea}
+                  price={property.price}
                   images={property.images}
                   verificationScore={property.verificationScore}
                   engagementScore={property.engagementScore}
                   floor={property.floor}
+                  sourceCount={property._count.sourceListings}
                 />
                 {/* Overlay badges */}
                 <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-[1] pointer-events-none">
-                  {property.aiScore && (
+                  {property.aiScore != null && (
                     <span className="flex items-center gap-1 rounded-full bg-black/80 px-2 py-0.5 text-xs font-medium text-amber-400 backdrop-blur">
                       <Sparkles className="h-3 w-3" />
                       {property.aiScore}/100
@@ -231,6 +261,31 @@ async function ResultsView({ params }: { params: Awaited<SearchPageProps["search
               </div>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-2">
+              {page > 1 && (
+                <Link
+                  href={`/search?${(() => { const p = new URLSearchParams(params as Record<string, string>); p.set("page", String(page - 1)); p.set("view", "results"); return p.toString(); })()}`}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Previous
+                </Link>
+              )}
+              <span className="px-4 py-2 text-sm text-gray-500">
+                Page {page} of {totalPages}
+              </span>
+              {page < totalPages && (
+                <Link
+                  href={`/search?${(() => { const p = new URLSearchParams(params as Record<string, string>); p.set("page", String(page + 1)); p.set("view", "results"); return p.toString(); })()}`}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Next
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Not happy? */}
           <div className="mt-12 rounded-2xl border border-gray-200 bg-white p-8 text-center">

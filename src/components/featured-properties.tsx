@@ -21,7 +21,9 @@ interface Property {
   address: string;
   propertyType: string;
   monthlyRent: number | null;
+  price: number | null;
   saleableArea: number | null;
+  grossArea: number | null;
   images: string[];
   floor: string | null;
   verificationScore: number;
@@ -128,21 +130,31 @@ export function FeaturedProperties({ properties }: FeaturedPropertiesProps) {
                     </p>
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    <p className="text-lg font-bold text-[#1e1b4b]">
-                      $
-                      {property.monthlyRent
-                        ? `${(property.monthlyRent / 1000).toFixed(0)}K`
-                        : "N/A"}
-                    </p>
-                    <p className="text-[11px] text-gray-400">/month</p>
+                    {property.monthlyRent ? (
+                      <>
+                        <p className="text-lg font-bold text-[#1e1b4b]">
+                          ${(property.monthlyRent / 1000).toFixed(0)}K
+                        </p>
+                        <p className="text-[11px] text-gray-400">/month</p>
+                      </>
+                    ) : property.price ? (
+                      <>
+                        <p className="text-lg font-bold text-[#1e1b4b]">
+                          ${property.price >= 1_000_000 ? `${(property.price / 1_000_000).toFixed(1)}M` : `${(property.price / 1000).toFixed(0)}K`}
+                        </p>
+                        <p className="text-[11px] text-gray-400">sale</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-400">Enquire</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500">
-                  {property.saleableArea && (
+                  {(property.saleableArea || property.grossArea) && (
                     <span className="flex items-center gap-1">
                       <Maximize2 className="h-3.5 w-3.5" />
-                      {property.saleableArea.toLocaleString()}sqft
+                      {(property.saleableArea || property.grossArea)!.toLocaleString()}sqft
                     </span>
                   )}
                   {property.floor && (

@@ -21,7 +21,7 @@ async function getHotProperties() {
   try {
     return await prisma.property.findMany({
       where: { status: "active" },
-      orderBy: [{ engagementScore: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       take: 10,
     });
   } catch {
@@ -33,11 +33,23 @@ async function getFeaturedProperties() {
   try {
     return await prisma.property.findMany({
       where: { status: "active" },
-      orderBy: [{ engagementScore: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       take: 6,
     });
   } catch {
     return [];
+  }
+}
+
+async function getPropertyStats() {
+  try {
+    const [total, sources] = await Promise.all([
+      prisma.property.count({ where: { status: "active" } }),
+      prisma.sourceListing.groupBy({ by: ["source"], _count: true }),
+    ]);
+    return { total, sourceCount: sources.length };
+  } catch {
+    return { total: 0, sourceCount: 0 };
   }
 }
 
@@ -73,9 +85,10 @@ const MARKET_INSIGHTS = [
 ];
 
 export default async function HomePage() {
-  const [hotProperties, featuredProperties] = await Promise.all([
+  const [hotProperties, featuredProperties, stats] = await Promise.all([
     getHotProperties(),
     getFeaturedProperties(),
+    getPropertyStats(),
   ]);
 
   return (
@@ -101,15 +114,15 @@ export default async function HomePage() {
             </p>
             <div className="mt-8 flex items-center gap-4">
               <Link
-                href="/search"
+                href="/search?view=results"
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:bg-indigo-700 hover:shadow-lg"
               >
                 Browse Properties
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <span className="text-sm text-gray-400">
-                {hotProperties.length > 0
-                  ? `${hotProperties.length}+ hot listings`
+                {stats.total > 0
+                  ? `${stats.total.toLocaleString()} listings from ${stats.sourceCount} sources`
                   : "New listings daily"}
               </span>
             </div>
@@ -208,12 +221,18 @@ export default async function HomePage() {
                       <p className="text-lg font-bold text-gray-900">
                         {property.monthlyRent
                           ? formatCurrency(property.monthlyRent)
-                          : "Price on ask"}
-                        {property.monthlyRent && (
+                          : property.price
+                            ? formatCurrency(property.price)
+                            : "Price on ask"}
+                        {property.monthlyRent ? (
                           <span className="text-sm font-normal text-gray-400">
                             /mo
                           </span>
-                        )}
+                        ) : property.price ? (
+                          <span className="text-sm font-normal text-gray-400">
+                            {" "}sale
+                          </span>
+                        ) : null}
                       </p>
                       <span className="text-xs font-medium text-indigo-600 opacity-0 transition-opacity group-hover:opacity-100">
                         View &rarr;
@@ -345,7 +364,7 @@ export default async function HomePage() {
             <div className="text-center">
               <Building2 className="mx-auto h-6 w-6 text-indigo-600" />
               <p className="mt-2 text-sm font-semibold text-gray-900">
-                500+ Spaces
+                {stats.total > 0 ? `${stats.total.toLocaleString()}+ Spaces` : "500+ Spaces"}
               </p>
               <p className="mt-0.5 text-xs text-gray-500">
                 Across Hong Kong
