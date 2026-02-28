@@ -6,7 +6,7 @@ AI-powered commercial real estate platform for SMEs in Hong Kong. Find, evaluate
 
 - **Framework**: Next.js 16 (App Router, Server Components)
 - **Language**: TypeScript
-- **Database**: PostgreSQL with pgvector
+- **Database**: Supabase (PostgreSQL with pgvector)
 - **ORM**: Prisma
 - **Auth**: NextAuth.js v5
 - **UI**: Tailwind CSS + shadcn/ui-style components
@@ -17,7 +17,7 @@ AI-powered commercial real estate platform for SMEs in Hong Kong. Find, evaluate
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL 15+ with pgvector extension
+- [Supabase](https://supabase.com) account (PostgreSQL with pgvector)
 - OpenAI API key (for AI features)
 
 ### Setup
@@ -28,12 +28,25 @@ AI-powered commercial real estate platform for SMEs in Hong Kong. Find, evaluate
 npm install
 ```
 
-2. **Configure environment:**
+2. **Create a Supabase project:**
 
-Copy `.env` and update the values:
+- Go to [supabase.com](https://supabase.com) → New Project
+- Note your project ref, database password, and region
+- Enable the **pgvector** extension: SQL Editor → run `CREATE EXTENSION IF NOT EXISTS vector;`
+
+3. **Configure environment:**
+
+Copy `.env.example` to `.env` and fill in your values:
 
 ```
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/balambal?schema=public"
+# Supabase Database (Project Settings → Database → Connection string URI)
+DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres?schema=public"
+
+# Supabase Client (Project Settings → API - optional, for Storage/Realtime)
+NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+
+# Auth
 NEXTAUTH_SECRET="generate-a-random-secret"
 NEXTAUTH_URL="http://localhost:3000"
 OPENAI_API_KEY="sk-your-key-here"

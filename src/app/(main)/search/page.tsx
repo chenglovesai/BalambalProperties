@@ -61,18 +61,29 @@ async function searchProperties(params: Awaited<SearchPageProps["searchParams"]>
   }
 
   if (params.q) {
-    where.AND = [
-      ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
-      {
-        OR: [
-          { title: { contains: params.q, mode: "insensitive" } },
-          { description: { contains: params.q, mode: "insensitive" } },
-          { district: { contains: params.q, mode: "insensitive" } },
-          { address: { contains: params.q, mode: "insensitive" } },
-          { buildingName: { contains: params.q, mode: "insensitive" } },
-        ],
-      },
-    ];
+    const words = params.q.split(/\s+/).filter((w) => w.length >= 2);
+    const searchFields = ["title", "description", "district", "address", "buildingName"] as const;
+
+    if (words.length > 1) {
+      const wordConditions: Prisma.PropertyWhereInput[] = words.map((word) => ({
+        OR: searchFields.map((field) => ({
+          [field]: { contains: word, mode: "insensitive" as const },
+        })),
+      }));
+      where.AND = [
+        ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
+        { OR: wordConditions },
+      ];
+    } else {
+      where.AND = [
+        ...(where.AND ? (where.AND as Prisma.PropertyWhereInput[]) : []),
+        {
+          OR: searchFields.map((field) => ({
+            [field]: { contains: params.q!, mode: "insensitive" as const },
+          })),
+        },
+      ];
+    }
   }
 
   let orderBy: Prisma.PropertyOrderByWithRelationInput = { updatedAt: "desc" };

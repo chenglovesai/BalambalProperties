@@ -151,9 +151,31 @@ export class CentalineScraper extends BaseScraper {
         const images: string[] = [];
         for (const img of imgElements) {
           const el = img as HTMLImageElement;
+          let srcsetBest: string | null = null;
+          const srcset = el.getAttribute("srcset") || el.getAttribute("data-srcset");
+          if (srcset) {
+            let bestScore = -1;
+            for (const part of srcset.split(",")) {
+              const [urlPart, descriptor] = part.trim().split(/\s+/);
+              if (!urlPart) continue;
+              let score = 0;
+              if (descriptor?.endsWith("w")) {
+                const parsed = parseInt(descriptor, 10);
+                score = Number.isFinite(parsed) ? parsed : 0;
+              } else if (descriptor?.endsWith("x")) {
+                const parsed = parseFloat(descriptor);
+                score = Number.isFinite(parsed) ? Math.round(parsed * 1000) : 0;
+              }
+              if (score >= bestScore) {
+                bestScore = score;
+                srcsetBest = urlPart;
+              }
+            }
+          }
           const src = el.getAttribute("data-src")
             || el.getAttribute("data-original")
             || el.getAttribute("data-lazy-src")
+            || srcsetBest
             || el.src;
           if (src && src.startsWith("http") && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon") && !src.includes("placeholder") && !src.includes("no-photo")) {
             images.push(src);
@@ -254,7 +276,7 @@ export class CentalineScraper extends BaseScraper {
       salePrice,
       psfPrice: psfPriceVal,
       floor: card.floorLevel ? `${card.floorLevel} Floor` : undefined,
-      images: card.images,
+      images: this.normalizeImageUrls(card.images),
       agentName: card.agentName || undefined,
       agentContact: card.agentPhone || undefined,
       agentLicense: card.agentLicense || undefined,

@@ -184,9 +184,31 @@ export class SpaciousScraper extends BaseScraper {
         const images: string[] = [];
         for (const img of imgElements) {
           const imgEl = img as HTMLImageElement;
+          let srcsetBest: string | null = null;
+          const srcset = imgEl.getAttribute("srcset") || imgEl.getAttribute("data-srcset");
+          if (srcset) {
+            let bestScore = -1;
+            for (const part of srcset.split(",")) {
+              const [urlPart, descriptor] = part.trim().split(/\s+/);
+              if (!urlPart) continue;
+              let score = 0;
+              if (descriptor?.endsWith("w")) {
+                const parsed = parseInt(descriptor, 10);
+                score = Number.isFinite(parsed) ? parsed : 0;
+              } else if (descriptor?.endsWith("x")) {
+                const parsed = parseFloat(descriptor);
+                score = Number.isFinite(parsed) ? Math.round(parsed * 1000) : 0;
+              }
+              if (score >= bestScore) {
+                bestScore = score;
+                srcsetBest = urlPart;
+              }
+            }
+          }
           const src = imgEl.getAttribute("data-src")
             || imgEl.getAttribute("data-original")
             || imgEl.getAttribute("data-lazy-src")
+            || srcsetBest
             || imgEl.src;
           if (src && src.startsWith("http") && !src.includes("avatar") && !src.includes("logo") && !src.includes("icon") && !src.includes("placeholder") && !src.includes("no-photo")) {
             images.push(src);
@@ -235,7 +257,7 @@ export class SpaciousScraper extends BaseScraper {
       monthlyRent: price,
       psfRent: psf,
       floor: undefined,
-      images: card.images,
+      images: this.normalizeImageUrls(card.images),
       features: {},
       rawData: card as unknown as Record<string, unknown>,
       scrapedAt: new Date(),
@@ -271,7 +293,7 @@ export class SpaciousScraper extends BaseScraper {
       transactionType: "rent",
       saleableAreaSqft: area as number | undefined,
       monthlyRent: price as number | undefined,
-      images,
+      images: this.normalizeImageUrls(images),
       features: (data.features || {}) as Record<string, unknown>,
       rawData: data,
       scrapedAt: new Date(),

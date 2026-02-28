@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { describeImage, generateEmbedding } from "@/lib/ai/embeddings";
+import { describeImage } from "@/lib/ai/embeddings";
+import { parseNaturalLanguageQuery } from "@/lib/ai/nlp-parser";
 
+/**
+ * Vibe Image / Mood Board Search
+ * Analyzes an uploaded image (mood board, inspiration photo, floor plan) and returns
+ * structured search filters to find similar commercial properties.
+ */
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -26,22 +32,22 @@ export async function POST(req: NextRequest) {
 
     const description = await describeImage(dataUrl);
 
-    if (!description) {
+    if (!description || !description.trim()) {
       return NextResponse.json(
         { error: "Could not analyze image" },
         { status: 422 }
       );
     }
 
-    const embedding = await generateEmbedding(description);
+    const parsed = await parseNaturalLanguageQuery(description);
 
     return NextResponse.json({
       description,
-      embedding,
-      message: "Image analyzed. Use the embedding for vector similarity search.",
+      filters: parsed.filters,
+      rawIntent: parsed.rawIntent,
     });
   } catch (error) {
-    console.error("Image search error:", error);
+    console.error("Vibe image search error:", error);
     return NextResponse.json(
       { error: "Failed to process image" },
       { status: 500 }
