@@ -12,7 +12,7 @@ function getOpenAI() {
   return _openai;
 }
 
-const SYSTEM_PROMPT = `You are a Hong Kong commercial real estate advisor chatbot embedded in a property search platform called Balambal.
+const SYSTEM_PROMPT = `You are a Hong Kong commercial real estate advisor chatbot embedded in a property search platform called BalaOne.
 
 YOUR ROLE: Have a natural conversation to understand what the user needs, then output structured filters so the platform can search for matching properties.
 
