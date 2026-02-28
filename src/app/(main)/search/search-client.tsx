@@ -103,6 +103,8 @@ export function SearchPageClient({
   const [maxPrice, setMaxPrice] = useState(params.maxRent || "");
   const [minArea, setMinArea] = useState(params.minArea || "");
   const [maxArea, setMaxArea] = useState(params.maxArea || "");
+  const [fengShuiRated, setFengShuiRated] = useState(params.fengShuiRated === "1");
+  const [minFengShui, setMinFengShui] = useState(params.minFengShui || "");
   const [location, setLocation] = useState(params.districts || "");
 
   // AI chat state
@@ -120,11 +122,13 @@ export function SearchPageClient({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+
   const activeFilterCount =
     (currentDistricts.length > 0 ? 1 : 0) +
     (currentTypes.length > 0 ? 1 : 0) +
     (params.minRent || params.maxRent ? 1 : 0) +
-    (params.minArea || params.maxArea ? 1 : 0);
+    (params.minArea || params.maxArea ? 1 : 0) +
+    (params.fengShuiRated || params.minFengShui ? 1 : 0);
 
   function applyFilters() {
     const p = new URLSearchParams();
@@ -133,6 +137,8 @@ export function SearchPageClient({
     if (maxPrice) p.set("maxRent", maxPrice);
     if (minArea) p.set("minArea", minArea);
     if (maxArea) p.set("maxArea", maxArea);
+    if (fengShuiRated) p.set("fengShuiRated", "1");
+    if (minFengShui) p.set("minFengShui", minFengShui);
     const useTypes = types.length ? types : [];
     if (useTypes.length) p.set("types", useTypes.join(","));
     if (params.sort) p.set("sort", params.sort);
@@ -148,6 +154,8 @@ export function SearchPageClient({
     setMaxPrice("");
     setMinArea("");
     setMaxArea("");
+    setFengShuiRated(false);
+    setMinFengShui("");
     setLocation("");
     setDuration("");
     router.push("/search");
@@ -242,6 +250,17 @@ export function SearchPageClient({
       router.push(`/search?q=${encodeURIComponent(lastQuery)}`);
     }
     setAiOpen(false);
+  }
+
+  function applyFengShuiFromDropdown(rated: boolean, minScore: string) {
+    setFengShuiRated(rated);
+    setMinFengShui(minScore);
+    const p = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])
+    );
+    if (rated) p.set("fengShuiRated", "1"); else p.delete("fengShuiRated");
+    if (minScore) p.set("minFengShui", minScore); else p.delete("minFengShui");
+    router.push(`/search?${p.toString()}`);
   }
 
   function handleWhatIf(scenarioId: string) {
@@ -341,6 +360,21 @@ export function SearchPageClient({
               );
             })}
 
+            {/* Feng Shui Toggle */}
+            <span className="text-gray-200">|</span>
+            <button
+              onClick={() => applyFengShuiFromDropdown(!fengShuiRated, fengShuiRated ? "" : minFengShui)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-medium transition-colors flex-shrink-0",
+                fengShuiRated
+                  ? "bg-violet-600 text-white"
+                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+              )}
+            >
+              <span className="text-[13px] leading-none">&#9765;</span>
+              Feng Shui
+            </button>
+
             {/* Active filter tags */}
             {currentDistricts.length > 0 && (
               <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 flex-shrink-0">
@@ -355,6 +389,11 @@ export function SearchPageClient({
             {(params.minRent || params.maxRent) && (
               <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 flex-shrink-0">
                 {params.minRent ? `$${Number(params.minRent).toLocaleString()}` : "$0"} – {params.maxRent ? `$${Number(params.maxRent).toLocaleString()}` : "any"}
+              </span>
+            )}
+            {(params.fengShuiRated || params.minFengShui) && (
+              <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700 flex-shrink-0">
+                Feng Shui{params.minFengShui ? ` ${params.minFengShui}+` : " rated"}
               </span>
             )}
             {hasAnyFilter && (
@@ -597,6 +636,34 @@ export function SearchPageClient({
                   <span className="text-gray-300">–</span>
                   <input type="text" placeholder="Max" value={maxArea} onChange={(e) => setMaxArea(e.target.value)}
                     className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black placeholder:text-gray-400 focus:border-gray-400 focus:outline-none" />
+                </div>
+              </div>
+
+              {/* Feng Shui */}
+              <div>
+                <label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <Sparkles className="h-3.5 w-3.5" /> Feng Shui
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fengShuiRated}
+                      onChange={(e) => setFengShuiRated(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+                    />
+                    Only show Feng Shui rated properties
+                  </label>
+                  <select
+                    value={minFengShui}
+                    onChange={(e) => setMinFengShui(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black focus:border-gray-400 focus:outline-none"
+                  >
+                    <option value="">Any Feng Shui score</option>
+                    <option value="60">60+ (Fair)</option>
+                    <option value="70">70+ (Good)</option>
+                    <option value="80">80+ (Excellent)</option>
+                  </select>
                 </div>
               </div>
 

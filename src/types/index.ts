@@ -27,6 +27,8 @@ export interface SearchParams {
   maxRent?: number;
   minArea?: number;
   maxArea?: number;
+  fengShuiRated?: boolean;
+  minFengShui?: number;
   floor?: string;
   sort?: "relevance" | "price_asc" | "price_desc" | "area_asc" | "area_desc" | "recent";
   page?: number;
