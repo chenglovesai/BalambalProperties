@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith("sk-your")) {
+    if (!process.env.MINIMAX_API_KEY) {
       const parsed = fallbackParse(query);
       return NextResponse.json(parsed);
     }

@@ -2,7 +2,8 @@ import OpenAI from "openai";
 import type { ParsedQuery } from "@/types";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.MINIMAX_API_KEY,
+  baseURL: "https://api.minimaxi.chat/v1",
 });
 
 const SYSTEM_PROMPT = `You are a Hong Kong commercial real estate search assistant. Parse the user's natural language query into a structured search object.
@@ -46,19 +47,19 @@ Return a JSON object with this exact structure:
 export async function parseNaturalLanguageQuery(query: string): Promise<ParsedQuery> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
+      model: "MiniMax-Text-01",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANT: Respond ONLY with a valid JSON object. No markdown, no explanation, just raw JSON." },
         { role: "user", content: query },
       ],
       temperature: 0.1,
       max_tokens: 500,
     });
 
-    const content = response.choices[0]?.message?.content;
+    let content = response.choices[0]?.message?.content;
     if (!content) throw new Error("No response from AI");
 
+    content = content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
     const parsed = JSON.parse(content);
     return {
       filters: {

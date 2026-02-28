@@ -32,7 +32,7 @@
   --foreground: #0a0f1c;
   --card: #ffffff;
   --card-foreground: #0a0f1c;
-  --primary: #4f46e5;
+  --primary: #1e1b4b;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
   --secondary-foreground: #1e293b;
@@ -44,7 +44,7 @@
   --destructive-foreground: #ffffff;
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #4f46e5;
+  --ring: #1e1b4b;
 }
 
 body {
@@ -54,4 +54,12 @@ body {
 
 * {
   border-color: var(--border);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

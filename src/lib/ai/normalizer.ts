@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.MINIMAX_API_KEY,
+  baseURL: "https://api.minimaxi.chat/v1",
 });
 
 export interface NormalizedListing {
@@ -38,10 +39,9 @@ Return a JSON object with the NormalizedListing schema.`;
 export async function normalizeListing(rawData: Record<string, unknown>): Promise<NormalizedListing> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
+      model: "MiniMax-Text-01",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANT: Respond ONLY with a valid JSON object. No markdown, no explanation, just raw JSON." },
         {
           role: "user",
           content: `Normalize this listing data:\n${JSON.stringify(rawData, null, 2)}`,
@@ -51,9 +51,10 @@ export async function normalizeListing(rawData: Record<string, unknown>): Promis
       max_tokens: 800,
     });
 
-    const content = response.choices[0]?.message?.content;
+    let content = response.choices[0]?.message?.content;
     if (!content) throw new Error("No AI response");
 
+    content = content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
     return JSON.parse(content);
   } catch (error) {
     console.error("Normalization error:", error);

@@ -22,6 +22,7 @@ model User {
   updatedAt      DateTime          @updatedAt
   shortlists     Shortlist[]
   interactions   UserInteraction[]
+  searchSessions SearchSession[]
 }
 
 model Property {
@@ -42,10 +43,31 @@ model Property {
   price             Float?
   floor             String?
   images            String[]
+  videoTourUrl      String?
   floorPlanUrl      String?
   latitude          Float?
   longitude         Float?
   verificationScore Float           @default(0)
+  aiScore           Int?
+  buildingGrade     String?
+  buildingName      String?
+  ceilingHeight     Float?
+  loadingAccess     Boolean?
+  hasExhaust        Boolean?
+  hasFSD            Boolean?
+  mtrProximity      String?
+  mtrStation        String?
+  agentName         String?
+  agentPhone        String?
+  agentEmail        String?
+  agentCompany      String?
+  agentCommission   Float?
+  buildingDeposit   Float?
+  legalFees         Float?
+  stampDuty         Float?
+  fengShuiScore     Int?
+  fengShuiNotes     String?
+  regulatoryNotes   Json?
   status            String          @default("active")
   engagementScore   Int             @default(0)
   features          Json?
@@ -127,4 +149,33 @@ model UserInteraction {
   action     String
   metadata   Json?
   createdAt  DateTime  @default(now())
+}
+
+model SearchSession {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionData   Json
+  wizardStep    Int      @default(0)
+  completed     Boolean  @default(false)
+  resultFilters Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Solicitor {
+  id          String   @id @default(cuid())
+  name        String
+  firm        String
+  email       String?
+  phone       String?
+  website     String?
+  specialties String[]
+  languages   String[]
+  district    String?
+  rating      Float?
+  reviewCount Int      @default(0)
+  description String?
+  image       String?
+  createdAt   DateTime @default(now())
 }

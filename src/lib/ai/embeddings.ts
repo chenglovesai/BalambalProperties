@@ -1,12 +1,13 @@
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.MINIMAX_API_KEY,
+  baseURL: "https://api.minimaxi.chat/v1",
 });
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",
+    model: "embo-01",
     input: text,
   });
   return response.data[0].embedding;
@@ -38,7 +39,7 @@ export function buildPropertyEmbeddingText(property: {
 export async function describeImage(imageUrl: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "MiniMax-Text-01",
       messages: [
         {
           role: "user",

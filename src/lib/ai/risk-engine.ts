@@ -2,7 +2,8 @@ import OpenAI from "openai";
 import type { RiskRubricResult } from "@/types";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.MINIMAX_API_KEY,
+  baseURL: "https://api.minimaxi.chat/v1",
 });
 
 interface PropertyContext {
@@ -91,10 +92,9 @@ Building Record: ${property.evidencePack?.buildingRecordStatus || "Unknown"}
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
+      model: "MiniMax-Text-01",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANT: Respond ONLY with a valid JSON object. No markdown, no explanation, just raw JSON." },
         {
           role: "user",
           content: `Assess this property for ${sectorType.toUpperCase()} use. Run these checks: ${checks.join(", ")}.
@@ -108,9 +108,10 @@ Return JSON: { "results": [{ "checkName": string, "status": "pass"|"fail"|"risk"
       max_tokens: 1500,
     });
 
-    const content = response.choices[0]?.message?.content;
+    let content = response.choices[0]?.message?.content;
     if (!content) throw new Error("No AI response");
 
+    content = content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
     const parsed = JSON.parse(content);
     return (parsed.results || []).map((r: RiskRubricResult) => ({
       checkName: r.checkName,

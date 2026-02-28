@@ -3,6 +3,57 @@ import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+const MTR_STATIONS: Record<string, string> = {
+  "Central": "Central",
+  "Wan Chai": "Wan Chai",
+  "Causeway Bay": "Causeway Bay",
+  "Mong Kok": "Mong Kok",
+  "Tsim Sha Tsui": "Tsim Sha Tsui",
+  "Kwun Tong": "Kwun Tong",
+  "Kwai Chung": "Kwai Hing",
+  "Sheung Wan": "Sheung Wan",
+  "Sai Ying Pun": "Sai Ying Pun",
+  "North Point": "North Point",
+  "Fo Tan": "Fo Tan",
+  "Aberdeen": "Aberdeen",
+  "Cheung Sha Wan": "Lai Chi Kok",
+  "Jordan": "Jordan",
+  "Yau Ma Tei": "Yau Ma Tei",
+  "Sham Shui Po": "Sham Shui Po",
+  "Tuen Mun": "Tuen Mun",
+  "Tsuen Wan": "Tsuen Wan",
+};
+
+const AGENTS = [
+  { name: "David Chan", phone: "+852 9123 4567", email: "david@chanproperties.hk", company: "Chan Properties Ltd" },
+  { name: "Sarah Lee", phone: "+852 9234 5678", email: "sarah@leerealestate.hk", company: "Lee Real Estate" },
+  { name: "Michael Wong", phone: "+852 9345 6789", email: "michael@wongassoc.hk", company: "Wong & Associates" },
+  { name: "Jennifer Lam", phone: "+852 9456 7890", email: "jennifer@hkcommercial.hk", company: "HK Commercial Agency" },
+  { name: "Raymond Ng", phone: "+852 9567 8901", email: "raymond@pacificrealty.hk", company: "Pacific Realty" },
+  { name: "Vivian Tsang", phone: "+852 9678 9012", email: "vivian@primespace.hk", company: "Prime Space HK" },
+];
+
+const GRADES: Record<string, string> = {
+  "Central": "A",
+  "Wan Chai": "B",
+  "Tsim Sha Tsui": "A",
+  "Causeway Bay": "A",
+  "Kwun Tong": "B",
+  "North Point": "B",
+  "Mong Kok": "B",
+  "Sai Ying Pun": "B",
+  "Sheung Wan": "B",
+  "Jordan": "C",
+  "Yau Ma Tei": "C",
+  "Sham Shui Po": "C",
+  "Kwai Chung": "C",
+  "Fo Tan": "C",
+  "Tuen Mun": "C",
+  "Cheung Sha Wan": "C",
+  "Tsuen Wan": "C",
+  "Aberdeen": "B",
+};
+
 const SEED_PROPERTIES = [
   {
     title: "Prime Ground Floor Retail Unit - Nathan Road",
@@ -15,12 +66,19 @@ const SEED_PROPERTIES = [
     monthlyRent: 85000,
     psfRent: 131,
     managementFee: 3500,
+    price: 12000000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800"],
     latitude: 22.3193,
     longitude: 114.1694,
     engagementScore: 92,
+    ceilingHeight: 3.5,
+    hasExhaust: true,
+    loadingAccess: false,
     features: { frontage: "wide", aircon: true, renovation: "recent", mtrNearby: true },
+    fengShuiScore: 72,
+    fengShuiNotes: "Good facing direction. Main entrance faces south-east which is auspicious for commercial activity. Water element nearby (drainage) may need remediation.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: true, zoningApproved: true, signagePermit: "required" },
   },
   {
     title: "Industrial Kitchen Space with Exhaust System",
@@ -33,12 +91,20 @@ const SEED_PROPERTIES = [
     monthlyRent: 45000,
     psfRent: 38,
     managementFee: 5000,
+    price: 6500000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800"],
     latitude: 22.3569,
     longitude: 114.1306,
     engagementScore: 78,
+    ceilingHeight: 4.0,
+    hasExhaust: true,
+    hasFSD: true,
+    loadingAccess: true,
     features: { exhaustSystem: true, greaseTrap: true, fehdApproved: true, loadingAccess: true },
+    fengShuiScore: 55,
+    fengShuiNotes: "Industrial area has strong metal element. Kitchen placement needs careful fire element balance. Rear entrance may benefit from a water feature.",
+    regulatoryNotes: { fehdLicense: "approved", fireSafety: true, exhaustCert: true, greaseTrap: true, ubw: "clear" },
   },
   {
     title: "Modern Office Suite - Central Business District",
@@ -51,12 +117,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 175000,
     psfRent: 70,
     managementFee: 15000,
+    price: 52000000,
     floor: "18/F",
     images: ["https://images.unsplash.com/photo-1497366216548-37526070297c?w=800"],
     latitude: 22.2833,
     longitude: 114.1588,
     engagementScore: 88,
+    ceilingHeight: 2.7,
     features: { harbourView: true, twentyFourHourAccess: true, gradeA: true, fibreOptic: true },
+    fengShuiScore: 88,
+    fengShuiNotes: "Excellent harbour view brings wealth energy. High floor provides commanding position. Building faces favourable direction for business prosperity.",
+    regulatoryNotes: { fireEscape: true, liftAccess: true, accessCompliance: true, zoningApproved: true },
   },
   {
     title: "Warehouse with Loading Dock - Kwai Chung Container Port",
@@ -69,12 +140,18 @@ const SEED_PROPERTIES = [
     monthlyRent: 65000,
     psfRent: 13,
     managementFee: 8000,
+    price: 15000000,
     floor: "2/F",
     images: ["https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800"],
     latitude: 22.3491,
     longitude: 114.1186,
     engagementScore: 65,
+    ceilingHeight: 4.5,
+    loadingAccess: true,
     features: { ceilingHeight: 4.5, reinforcedFloor: true, loadingDock: true, threePhasePower: true },
+    fengShuiScore: 45,
+    fengShuiNotes: "Container port area has unstable qi flow. Loading dock direction is acceptable. May benefit from protective elements at entrance.",
+    regulatoryNotes: { fireSafety: true, goodsLift: true, dangerousGoods: "n/a", structuralLoad: "verified" },
   },
   {
     title: "Cozy Café Space in Sheung Wan",
@@ -87,12 +164,18 @@ const SEED_PROPERTIES = [
     monthlyRent: 38000,
     psfRent: 109,
     managementFee: 2000,
+    price: 5200000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800"],
     latitude: 22.2838,
     longitude: 114.1505,
     engagementScore: 71,
+    ceilingHeight: 3.2,
+    hasExhaust: true,
     features: { exhaustDuct: true, walkUp: true, pedestrianFlow: "good" },
+    fengShuiScore: 68,
+    fengShuiNotes: "Hollywood Road has good energy flow. Walk-up buildings retain traditional qi. Corner position would be ideal; verify exact unit position.",
+    regulatoryNotes: { fehdLicense: "pending", fireSafety: "check_needed", exhaustCert: "partial", walkUpLimit: true },
   },
   {
     title: "Spacious Retail Unit - Tsim Sha Tsui",
@@ -105,12 +188,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 220000,
     psfRent: 122,
     managementFee: 12000,
+    price: 38000000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800"],
     latitude: 22.2966,
     longitude: 114.1677,
     engagementScore: 95,
+    ceilingHeight: 4.0,
     features: { doubleFrontage: true, highVisibility: true, mvacSystem: true },
+    fengShuiScore: 82,
+    fengShuiNotes: "Canton Road location is traditionally prosperous. Double frontage maximizes wealth energy intake. Harbour proximity brings water element balance.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: true, zoningApproved: true, signagePermit: "approved" },
   },
   {
     title: "Startup-Friendly Office - Wan Chai",
@@ -123,12 +211,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 28000,
     psfRent: 35,
     managementFee: 4500,
+    price: 7800000,
     floor: "15/F",
     images: ["https://images.unsplash.com/photo-1497215842964-222b430dc094?w=800"],
     latitude: 22.2783,
     longitude: 114.1747,
     engagementScore: 82,
+    ceilingHeight: 2.6,
     features: { fitted: true, openPlan: true, twentyFourHourAccess: true, mtrNearby: true },
+    fengShuiScore: 65,
+    fengShuiNotes: "Mid-level floor has balanced energy. Open plan promotes collaboration qi. Ensure desk placement avoids direct door alignment.",
+    regulatoryNotes: { fireEscape: true, liftAccess: true, accessCompliance: true },
   },
   {
     title: "Central Kitchen with Cold Storage - Fo Tan",
@@ -141,12 +234,20 @@ const SEED_PROPERTIES = [
     monthlyRent: 42000,
     psfRent: 19,
     managementFee: 4000,
+    price: 8500000,
     floor: "5/F",
     images: ["https://images.unsplash.com/photo-1577308856961-8e9ec50d0c67?w=800"],
     latitude: 22.3955,
     longitude: 114.1956,
     engagementScore: 58,
+    ceilingHeight: 3.8,
+    hasExhaust: true,
+    hasFSD: true,
+    loadingAccess: true,
     features: { coldStorage: true, threePhasePower: true, ventilation: true, goodsLift: true },
+    fengShuiScore: 50,
+    fengShuiNotes: "Industrial estate has neutral energy. Cold storage creates strong water element that may conflict with kitchen fire. Consider element balancing.",
+    regulatoryNotes: { fehdLicense: "previous_held", fireSafety: true, exhaustCert: true, coldStorage: "certified" },
   },
   {
     title: "Corner Shop in Causeway Bay",
@@ -159,12 +260,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 95000,
     psfRent: 198,
     managementFee: 5000,
+    price: 16000000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"],
     latitude: 22.2793,
     longitude: 114.1851,
     engagementScore: 89,
+    ceilingHeight: 3.0,
     features: { cornerUnit: true, doubleFrontage: true, highTraffic: true },
+    fengShuiScore: 78,
+    fengShuiNotes: "Corner position is excellent — captures energy from two directions. Causeway Bay has vibrant commercial qi. Entrance direction is key.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: true, zoningApproved: true, signagePermit: "required" },
   },
   {
     title: "Cold Chain Warehouse - Tuen Mun",
@@ -177,12 +283,18 @@ const SEED_PROPERTIES = [
     monthlyRent: 96000,
     psfRent: 12,
     managementFee: 12000,
+    price: 22000000,
     floor: "3/F",
     images: ["https://images.unsplash.com/photo-1553413077-190dd305871c?w=800"],
     latitude: 22.3908,
     longitude: 113.9748,
     engagementScore: 45,
+    ceilingHeight: 5.0,
+    loadingAccess: true,
     features: { temperatureControlled: true, dockLevel: true, goodsLiftCapacity: 5, twentyFourHourSecurity: true },
+    fengShuiScore: 40,
+    fengShuiNotes: "Remote location has weaker energy flow. Temperature control creates artificial elements. Highway proximity may cause turbulent qi.",
+    regulatoryNotes: { fireSafety: true, goodsLift: true, dangerousGoods: "check_required", temperatureLog: "required" },
   },
   {
     title: "Boutique Retail Space - Sai Ying Pun",
@@ -195,12 +307,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 42000,
     psfRent: 105,
     managementFee: 2500,
+    price: 6800000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1604328698692-f76ea9498e76?w=800"],
     latitude: 22.2865,
     longitude: 114.1430,
     engagementScore: 62,
+    ceilingHeight: 3.8,
     features: { highCeiling: true, characterBuilding: true, mtrNearby: true },
+    fengShuiScore: 70,
+    fengShuiNotes: "Gentrified area has rising energy. Character buildings retain historical qi. High ceilings allow good energy circulation.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: "partial", heritage: "check_required" },
   },
   {
     title: "Serviced Office - Kwun Tong Business Area",
@@ -213,12 +330,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 55000,
     psfRent: 37,
     managementFee: 8000,
+    price: 14000000,
     floor: "10/F",
     images: ["https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=800"],
     latitude: 22.3095,
     longitude: 114.2247,
     engagementScore: 74,
+    ceilingHeight: 2.7,
     features: { furnished: true, itInfrastructure: true, sharedFacilities: true },
+    fengShuiScore: 60,
+    fengShuiNotes: "Revitalized area shows improving energy. Shared facilities spread energy across tenants. Private meeting rooms help concentrate focus.",
+    regulatoryNotes: { fireEscape: true, liftAccess: true, accessCompliance: true },
   },
   {
     title: "Restaurant Space with Terrace - Stanley",
@@ -231,12 +353,19 @@ const SEED_PROPERTIES = [
     monthlyRent: 72000,
     psfRent: 80,
     managementFee: 6000,
+    price: 11000000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800"],
     latitude: 22.2191,
     longitude: 114.2112,
     engagementScore: 84,
+    ceilingHeight: 3.5,
+    hasExhaust: true,
+    hasFSD: true,
     features: { terrace: true, exhaustSystem: true, fehdApproved: true, liquorLicense: true, waterfront: true },
+    fengShuiScore: 85,
+    fengShuiNotes: "Waterfront location is highly auspicious for F&B — water represents wealth. Terrace allows natural energy flow. Excellent for restaurant prosperity.",
+    regulatoryNotes: { fehdLicense: "transferable", liquorLicense: "transferable", fireSafety: true, outdoorSeating: "approved" },
   },
   {
     title: "Mini-Storage Warehouse - Cheung Sha Wan",
@@ -249,12 +378,18 @@ const SEED_PROPERTIES = [
     monthlyRent: 38500,
     psfRent: 11,
     managementFee: 5500,
+    price: 9500000,
     floor: "8/F",
     images: ["https://images.unsplash.com/photo-1565610222536-ef125c59da2e?w=800"],
     latitude: 22.3375,
     longitude: 114.1535,
     engagementScore: 51,
+    ceilingHeight: 3.5,
+    loadingAccess: true,
     features: { goodsLiftCapacity: 3, threePhasePower: true, fireCompartment: true, mtrNearby: true },
+    fengShuiScore: 48,
+    fengShuiNotes: "Industrial zone has stable but unremarkable energy. Good for storage as it doesn't require active qi. MTR nearby provides some movement energy.",
+    regulatoryNotes: { fireSafety: true, goodsLift: true, miniStorage: "license_required" },
   },
   {
     title: "Street-Level Shop - Jordan",
@@ -267,12 +402,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 35000,
     psfRent: 117,
     managementFee: 1800,
+    price: 4800000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1567449303078-57ad995bd329?w=800"],
     latitude: 22.3048,
     longitude: 114.1699,
     engagementScore: 69,
+    ceilingHeight: 3.0,
     features: { streetLevel: true, pedestrianTraffic: "steady" },
+    fengShuiScore: 58,
+    fengShuiNotes: "Temple Street has cultural energy. Narrow-deep layout needs attention to lighting to maintain energy flow. Street-level captures passing wealth.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: "limited", streetVending: "not_permitted" },
   },
   {
     title: "Open-Plan Creative Office - North Point",
@@ -285,12 +425,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 48000,
     psfRent: 27,
     managementFee: 6000,
+    price: 12500000,
     floor: "7/F",
     images: ["https://images.unsplash.com/photo-1462826303086-329426d1aef5?w=800"],
     latitude: 22.2914,
     longitude: 114.2022,
     engagementScore: 77,
+    ceilingHeight: 3.5,
     features: { openPlan: true, highCeiling: true, creative: true, petFriendly: true },
+    fengShuiScore: 73,
+    fengShuiNotes: "High ceilings and open plan create expansive energy ideal for creativity. Exposed ductwork reveals building's functional elements — acceptable in modern feng shui.",
+    regulatoryNotes: { fireEscape: true, liftAccess: true, accessCompliance: true, petPolicy: "approved" },
   },
   {
     title: "Takeaway Kitchen Unit - Sham Shui Po",
@@ -303,12 +448,18 @@ const SEED_PROPERTIES = [
     monthlyRent: 22000,
     psfRent: 79,
     managementFee: 1500,
+    price: 3200000,
     floor: "G/F",
     images: ["https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=800"],
     latitude: 22.3307,
     longitude: 114.1621,
     engagementScore: 67,
+    ceilingHeight: 2.8,
+    hasExhaust: true,
     features: { basicExhaust: true, previousFnb: true, streetLevel: true },
+    fengShuiScore: 52,
+    fengShuiNotes: "Affordable district has community energy. Previous F&B use means established food qi. Exhaust upgrade would improve fire-water balance.",
+    regulatoryNotes: { fehdLicense: "new_application", fireSafety: "check_needed", exhaustCert: "upgrade_needed" },
   },
   {
     title: "Premium Retail Flagship - Central",
@@ -321,12 +472,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 450000,
     psfRent: 129,
     managementFee: 25000,
+    price: 85000000,
     floor: "G/F-1/F",
     images: ["https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800"],
     latitude: 22.2817,
     longitude: 114.1561,
     engagementScore: 97,
+    ceilingHeight: 6.0,
     features: { tripleHeight: true, glassFrontage: true, flagship: true, twentyFourHourSecurity: true },
+    fengShuiScore: 92,
+    fengShuiNotes: "Queen's Road Central is the most prosperous commercial feng shui line in HK. Triple-height brings heavenly energy down. Glass frontage invites wealth in.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: true, zoningApproved: true, signagePermit: "approved", heritage: "none" },
   },
   {
     title: "Compact Office Near MTR - Tsuen Wan",
@@ -339,12 +495,17 @@ const SEED_PROPERTIES = [
     monthlyRent: 12000,
     psfRent: 27,
     managementFee: 2500,
+    price: 3500000,
     floor: "12/F",
     images: ["https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800"],
     latitude: 22.3710,
     longitude: 114.1096,
     engagementScore: 55,
+    ceilingHeight: 2.5,
     features: { fitted: true, mtrNearby: true, parking: true, canteen: true },
+    fengShuiScore: 55,
+    fengShuiNotes: "MTR proximity brings active qi which is good for business. Small space needs careful furniture arrangement. Building amenities support employee wellbeing.",
+    regulatoryNotes: { fireEscape: true, liftAccess: true, accessCompliance: true },
   },
   {
     title: "Multi-Level Retail Space - Yau Ma Tei",
@@ -357,16 +518,32 @@ const SEED_PROPERTIES = [
     monthlyRent: 58000,
     psfRent: 53,
     managementFee: 4000,
+    price: 9200000,
     floor: "G/F-B/F",
     images: ["https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800"],
     latitude: 22.3065,
     longitude: 114.1681,
     engagementScore: 63,
+    ceilingHeight: 3.2,
     features: { multiLevel: true, basementStorage: true, streetFrontage: true },
+    fengShuiScore: 62,
+    fengShuiNotes: "Multi-level creates interesting energy flow. Ground floor captures street energy; basement needs extra lighting. Shanghai Street has traditional merchant qi.",
+    regulatoryNotes: { fireEscape: true, accessCompliance: "basement_limited", basementVentilation: "check_required" },
   },
 ];
 
 const EVIDENCE_STATUSES = ["verified", "pending", "unconfirmed"] as const;
+
+const SOLICITORS = [
+  { name: "Albert Leung", firm: "Leung & Partners", email: "albert@leungpartners.hk", phone: "+852 2523 4567", specialties: ["commercial_lease", "property_acquisition"], languages: ["English", "Cantonese", "Mandarin"], district: "Central", rating: 4.8, reviewCount: 127, description: "20+ years experience in commercial property law in Hong Kong. Specialises in complex lease negotiations and property acquisitions for SMEs." },
+  { name: "Grace Ho", firm: "Ho Solicitors", email: "grace@hosolicitors.hk", phone: "+852 2843 5678", specialties: ["commercial_lease", "regulatory_compliance", "f&b_licensing"], languages: ["English", "Cantonese"], district: "Wan Chai", rating: 4.6, reviewCount: 89, description: "Expert in F&B licensing and regulatory compliance. Helps restaurant owners navigate FEHD, FSD, and building management requirements." },
+  { name: "James Tam", firm: "Tam, Wong & Kwan", email: "james@twksolicitors.hk", phone: "+852 2721 6789", specialties: ["property_acquisition", "mortgage", "due_diligence"], languages: ["English", "Cantonese", "Mandarin"], district: "Tsim Sha Tsui", rating: 4.7, reviewCount: 203, description: "Leading property acquisition solicitor. Handles due diligence, title searches, and mortgage documentation for commercial properties." },
+  { name: "Diana Wu", firm: "Wu & Associates", email: "diana@wulaw.hk", phone: "+852 2975 7890", specialties: ["commercial_lease", "dispute_resolution", "landlord_tenant"], languages: ["English", "Cantonese"], district: "Kwun Tong", rating: 4.5, reviewCount: 65, description: "Specialises in landlord-tenant disputes and commercial lease negotiations. Strong track record in rent review arbitrations." },
+  { name: "Patrick Cheng", firm: "Cheng & Lee LLP", email: "patrick@chenglee.hk", phone: "+852 2867 8901", specialties: ["property_acquisition", "corporate_real_estate", "stamp_duty"], languages: ["English", "Cantonese", "Mandarin", "Japanese"], district: "Central", rating: 4.9, reviewCount: 312, description: "Top-tier commercial real estate solicitor handling multi-million dollar transactions. Expertise in corporate real estate structuring and stamp duty optimization." },
+  { name: "Michelle Yip", firm: "Yip Law Chambers", email: "michelle@yiplaw.hk", phone: "+852 2612 9012", specialties: ["regulatory_compliance", "warehouse_licensing", "industrial_property"], languages: ["English", "Cantonese"], district: "Kwai Chung", rating: 4.4, reviewCount: 48, description: "Industrial and warehouse property specialist. Navigates dangerous goods licensing, fire safety requirements, and industrial lease complexities." },
+  { name: "Kevin Lo", firm: "Lo & Fung Solicitors", email: "kevin@lofung.hk", phone: "+852 2156 0123", specialties: ["commercial_lease", "property_acquisition", "new_territories"], languages: ["English", "Cantonese"], district: "Sha Tin", rating: 4.3, reviewCount: 72, description: "New Territories property specialist. Extensive experience with village house conversions, industrial building transactions, and government lease matters." },
+  { name: "Stephanie Fong", firm: "Fong & Associates", email: "steph@fonglaw.hk", phone: "+852 2543 1234", specialties: ["commercial_lease", "f&b_licensing", "retail_lease"], languages: ["English", "Cantonese", "French"], district: "Sheung Wan", rating: 4.7, reviewCount: 91, description: "Retail and F&B lease expert. Helps SMEs negotiate favourable lease terms, rent-free periods, and fit-out contributions." },
+];
 
 function randomChoice<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -386,141 +563,40 @@ function generateEvidencePack() {
     ubwStatus: randomChoice(EVIDENCE_STATUSES),
     ubwDetail: randomChoice(["No UBW on record", "Minor UBW noted - subdivided unit", "Clear", null]),
   };
-
   const verified = Object.values(statuses).filter((v) => v === "verified").length;
-  const total = 5;
-  const completionPct = Math.round((verified / total) * 100);
-
+  const completionPct = Math.round((verified / 5) * 100);
   return { ...statuses, completionPct };
 }
 
-function generateRiskChecks(propertyType: string): Array<{
-  sectorType: string;
-  checkName: string;
-  status: string;
-  confidence: number;
-  explanation: string;
-  recommendation: string;
-  sources: string[];
-}> {
+function generateRiskChecks(propertyType: string) {
   const sectorType = propertyType === "retail" ? "retail" : propertyType === "warehouse" ? "warehouse" : "fnb";
-
   if (sectorType === "fnb") {
     return [
-      {
-        sectorType: "fnb",
-        checkName: "ventilation_exhaust",
-        status: randomChoice(["pass", "risk", "unknown"]),
-        confidence: 0.6 + Math.random() * 0.3,
-        explanation: "Ventilation system assessment based on property description and building records.",
-        recommendation: "Request the building's ventilation shaft diagram from the management office before proceeding.",
-        sources: ["https://www.fehd.gov.hk/english/licensing/guide.html"],
-      },
-      {
-        sectorType: "fnb",
-        checkName: "fire_safety",
-        status: randomChoice(["pass", "risk", "unknown"]),
-        confidence: 0.5 + Math.random() * 0.3,
-        explanation: "Fire safety documentation check based on building records status.",
-        recommendation: "Verify current fire safety certificate with the Fire Services Department.",
-        sources: ["https://www.hkfsd.gov.hk/eng/source/licensing/"],
-      },
-      {
-        sectorType: "fnb",
-        checkName: "fehd_licensing",
-        status: randomChoice(["pass", "risk", "unknown"]),
-        confidence: 0.5 + Math.random() * 0.4,
-        explanation: "FEHD licensing feasibility based on premises layout and building type.",
-        recommendation: "Consult FEHD's Guide on Types of Licences Required before finalizing.",
-        sources: ["https://www.fehd.gov.hk/english/licensing/guide.html"],
-      },
-      {
-        sectorType: "fnb",
-        checkName: "ubw_impact",
-        status: randomChoice(["pass", "risk", "unknown"]),
-        confidence: 0.4 + Math.random() * 0.4,
-        explanation: "Assessment of unauthorized building works impact on license applications.",
-        recommendation: "Check BRAVO system for any recorded UBW that could affect licensing.",
-        sources: ["https://bravo.bd.gov.hk/"],
-      },
+      { sectorType: "fnb", checkName: "ventilation_exhaust", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.6 + Math.random() * 0.3, explanation: "Ventilation system assessment based on property description and building records.", recommendation: "Request the building's ventilation shaft diagram from the management office before proceeding.", sources: ["https://www.fehd.gov.hk/english/licensing/guide.html"] },
+      { sectorType: "fnb", checkName: "fire_safety", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.5 + Math.random() * 0.3, explanation: "Fire safety documentation check based on building records status.", recommendation: "Verify current fire safety certificate with the Fire Services Department.", sources: ["https://www.hkfsd.gov.hk/eng/source/licensing/"] },
+      { sectorType: "fnb", checkName: "fehd_licensing", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.5 + Math.random() * 0.4, explanation: "FEHD licensing feasibility based on premises layout and building type.", recommendation: "Consult FEHD's Guide on Types of Licences Required before finalizing.", sources: ["https://www.fehd.gov.hk/english/licensing/guide.html"] },
+      { sectorType: "fnb", checkName: "ubw_impact", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.4 + Math.random() * 0.4, explanation: "Assessment of unauthorized building works impact on license applications.", recommendation: "Check BRAVO system for any recorded UBW that could affect licensing.", sources: ["https://bravo.bd.gov.hk/"] },
     ];
   }
-
   if (sectorType === "retail") {
     return [
-      {
-        sectorType: "retail",
-        checkName: "signage_shopfront",
-        status: randomChoice(["pass", "risk", "unknown"]),
-        confidence: 0.5 + Math.random() * 0.4,
-        explanation: "Signage and shopfront feasibility under building management rules.",
-        recommendation: "Check deed of mutual covenant for signage restrictions.",
-        sources: [],
-      },
-      {
-        sectorType: "retail",
-        checkName: "planning_compliance",
-        status: randomChoice(["pass", "risk"]),
-        confidence: 0.6 + Math.random() * 0.3,
-        explanation: "Planning condition compliance for commercial use in this building type.",
-        recommendation: "Verify the Outline Zoning Plan permits your intended use.",
-        sources: [],
-      },
-      {
-        sectorType: "retail",
-        checkName: "accessibility",
-        status: randomChoice(["pass", "unknown"]),
-        confidence: 0.5 + Math.random() * 0.3,
-        explanation: "Accessibility requirements assessment for the premises.",
-        recommendation: "Ensure the premises meets Design Manual barrier-free access requirements.",
-        sources: [],
-      },
+      { sectorType: "retail", checkName: "signage_shopfront", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.5 + Math.random() * 0.4, explanation: "Signage and shopfront feasibility under building management rules.", recommendation: "Check deed of mutual covenant for signage restrictions.", sources: [] as string[] },
+      { sectorType: "retail", checkName: "planning_compliance", status: randomChoice(["pass", "risk"]), confidence: 0.6 + Math.random() * 0.3, explanation: "Planning condition compliance for commercial use in this building type.", recommendation: "Verify the Outline Zoning Plan permits your intended use.", sources: [] as string[] },
+      { sectorType: "retail", checkName: "accessibility", status: randomChoice(["pass", "unknown"]), confidence: 0.5 + Math.random() * 0.3, explanation: "Accessibility requirements assessment for the premises.", recommendation: "Ensure the premises meets Design Manual barrier-free access requirements.", sources: [] as string[] },
     ];
   }
-
   return [
-    {
-      sectorType: "warehouse",
-      checkName: "loading_bay",
-      status: randomChoice(["pass", "risk", "unknown"]),
-      confidence: 0.6 + Math.random() * 0.3,
-      explanation: "Loading bay access assessment based on property description.",
-      recommendation: "Visit the property to verify loading bay dimensions and access hours.",
-      sources: [],
-    },
-    {
-      sectorType: "warehouse",
-      checkName: "goods_lift",
-      status: randomChoice(["pass", "risk"]),
-      confidence: 0.5 + Math.random() * 0.4,
-      explanation: "Goods lift capacity check for the building.",
-      recommendation: "Confirm goods lift capacity with building management.",
-      sources: [],
-    },
-    {
-      sectorType: "warehouse",
-      checkName: "fire_compartment",
-      status: randomChoice(["pass", "risk", "unknown"]),
-      confidence: 0.5 + Math.random() * 0.3,
-      explanation: "Fire compartmentation standards assessment.",
-      recommendation: "Verify fire compartmentation compliance with the Fire Services Department.",
-      sources: ["https://www.hkfsd.gov.hk/eng/source/licensing/"],
-    },
-    {
-      sectorType: "warehouse",
-      checkName: "dangerous_goods",
-      status: randomChoice(["pass", "unknown"]),
-      confidence: 0.4 + Math.random() * 0.3,
-      explanation: "Dangerous goods storage assessment based on available information.",
-      recommendation: "If storing dangerous goods, apply for the appropriate license from FSD.",
-      sources: ["https://www.hkfsd.gov.hk/eng/source/licensing/"],
-    },
+    { sectorType: "warehouse", checkName: "loading_bay", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.6 + Math.random() * 0.3, explanation: "Loading bay access assessment based on property description.", recommendation: "Visit the property to verify loading bay dimensions and access hours.", sources: [] as string[] },
+    { sectorType: "warehouse", checkName: "goods_lift", status: randomChoice(["pass", "risk"]), confidence: 0.5 + Math.random() * 0.4, explanation: "Goods lift capacity check for the building.", recommendation: "Confirm goods lift capacity with building management.", sources: [] as string[] },
+    { sectorType: "warehouse", checkName: "fire_compartment", status: randomChoice(["pass", "risk", "unknown"]), confidence: 0.5 + Math.random() * 0.3, explanation: "Fire compartmentation standards assessment.", recommendation: "Verify fire compartmentation compliance with the Fire Services Department.", sources: ["https://www.hkfsd.gov.hk/eng/source/licensing/"] },
+    { sectorType: "warehouse", checkName: "dangerous_goods", status: randomChoice(["pass", "unknown"]), confidence: 0.4 + Math.random() * 0.3, explanation: "Dangerous goods storage assessment based on available information.", recommendation: "If storing dangerous goods, apply for the appropriate license from FSD.", sources: ["https://www.hkfsd.gov.hk/eng/source/licensing/"] },
   ];
 }
 
 async function main() {
   console.log("Seeding database...");
 
+  await prisma.searchSession.deleteMany();
   await prisma.userInteraction.deleteMany();
   await prisma.shortlist.deleteMany();
   await prisma.riskCheck.deleteMany();
@@ -528,6 +604,7 @@ async function main() {
   await prisma.sourceListing.deleteMany();
   await prisma.property.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.solicitor.deleteMany();
 
   const demoPassword = await hash("demo1234", 12);
   const demoUser = await prisma.user.create({
@@ -538,20 +615,31 @@ async function main() {
       businessType: "fnb",
       businessDesc: "Opening a small café in Hong Kong",
       onboarded: true,
-      preferences: {
-        businessType: "fnb",
-        districts: ["Sheung Wan", "Wan Chai", "Central"],
-        budgetMax: 50000,
-        areaMin: 300,
-        areaMax: 800,
-      },
+      preferences: { businessType: "fnb", districts: ["Sheung Wan", "Wan Chai", "Central"], budgetMax: 50000, areaMin: 300, areaMax: 800 },
     },
   });
-
   console.log(`Created demo user: ${demoUser.email} (password: demo1234)`);
 
   for (const prop of SEED_PROPERTIES) {
     const canonicalId = `HK-${prop.district.replace(/\s/g, "").toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const agent = randomChoice(AGENTS);
+    const grade = GRADES[prop.district] || "C";
+    const mtrStation = MTR_STATIONS[prop.district] || null;
+
+    const commissionRate = prop.propertyType === "office" ? 0.5 : 1.0;
+    const agentCommission = prop.monthlyRent * commissionRate;
+    const buildingDeposit = prop.monthlyRent * 3;
+    const stampDuty = prop.price ? prop.price * 0.015 : undefined;
+    const legalFees = prop.price ? Math.max(10000, prop.price * 0.002) : 15000;
+
+    const aiScore = Math.min(100, Math.max(20, Math.round(
+      (prop.engagementScore * 0.3) +
+      ((prop.fengShuiScore || 50) * 0.1) +
+      (grade === "A" ? 25 : grade === "B" ? 18 : 12) +
+      (prop.hasExhaust ? 5 : 0) +
+      (prop.loadingAccess ? 5 : 0) +
+      (Math.random() * 15)
+    )));
 
     const property = await prisma.property.create({
       data: {
@@ -566,6 +654,7 @@ async function main() {
         monthlyRent: prop.monthlyRent,
         psfRent: prop.psfRent,
         managementFee: prop.managementFee,
+        price: prop.price,
         floor: prop.floor,
         images: prop.images,
         latitude: prop.latitude,
@@ -573,6 +662,26 @@ async function main() {
         engagementScore: prop.engagementScore,
         features: prop.features,
         verificationScore: 0,
+        buildingGrade: grade,
+        buildingName: prop.address.split(",")[0],
+        ceilingHeight: prop.ceilingHeight,
+        loadingAccess: prop.loadingAccess || false,
+        hasExhaust: prop.hasExhaust || false,
+        hasFSD: prop.hasFSD || false,
+        mtrProximity: mtrStation ? `${Math.floor(Math.random() * 10 + 2)} min walk` : "15+ min",
+        mtrStation,
+        agentName: agent.name,
+        agentPhone: agent.phone,
+        agentEmail: agent.email,
+        agentCompany: agent.company,
+        agentCommission,
+        buildingDeposit,
+        legalFees,
+        stampDuty,
+        aiScore,
+        fengShuiScore: prop.fengShuiScore,
+        fengShuiNotes: prop.fengShuiNotes,
+        regulatoryNotes: prop.regulatoryNotes,
       },
     });
 
@@ -582,47 +691,33 @@ async function main() {
         source: randomChoice(["28hse", "spacious", "agent_direct"]),
         sourceUrl: `https://example.com/listing/${canonicalId}`,
         rawData: JSON.parse(JSON.stringify(prop)),
-        agentName: randomChoice(["Chan Properties", "Lee Real Estate", "Wong & Associates", "HK Commercial Agency", "Pacific Realty"]),
-        agentContact: `agent${Math.floor(Math.random() * 100)}@example.com`,
+        agentName: agent.name,
+        agentContact: agent.email,
         scrapedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
       },
     });
 
     const ep = generateEvidencePack();
-    await prisma.evidencePack.create({
-      data: {
-        propertyId: property.id,
-        ...ep,
-      },
-    });
-
-    await prisma.property.update({
-      where: { id: property.id },
-      data: { verificationScore: ep.completionPct },
-    });
+    await prisma.evidencePack.create({ data: { propertyId: property.id, ...ep } });
+    await prisma.property.update({ where: { id: property.id }, data: { verificationScore: ep.completionPct } });
 
     const riskChecks = generateRiskChecks(prop.propertyType);
     for (const check of riskChecks) {
-      await prisma.riskCheck.create({
-        data: {
-          propertyId: property.id,
-          ...check,
-        },
-      });
+      await prisma.riskCheck.create({ data: { propertyId: property.id, ...check } });
     }
 
-    console.log(`  Created: ${property.title} (${property.district})`);
+    console.log(`  Created: ${property.title} (${property.district}) [Grade ${grade}, AI Score: ${aiScore}]`);
   }
 
-  console.log(`\nSeeded ${SEED_PROPERTIES.length} properties with evidence packs and risk checks.`);
+  for (const sol of SOLICITORS) {
+    await prisma.solicitor.create({ data: sol });
+  }
+  console.log(`\nCreated ${SOLICITORS.length} solicitors`);
+
+  console.log(`\nSeeded ${SEED_PROPERTIES.length} properties with evidence packs, risk checks, and new fields.`);
   console.log("Demo login: demo@balambal.com / demo1234");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });

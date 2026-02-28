@@ -1,0 +1,185 @@
+import { type Prisma, PrismaClient } from "@prisma/client";
+import { createLogger } from "./logger";
+import type { NormalizedProperty } from "./normalizer";
+
+function toJsonValue(obj: Record<string, unknown> | null): Prisma.InputJsonValue | undefined {
+  if (!obj) return undefined;
+  return JSON.parse(JSON.stringify(obj)) as Prisma.InputJsonValue;
+}
+
+const log = createLogger("db");
+
+const prisma = new PrismaClient();
+
+export interface UpsertResult {
+  created: number;
+  updated: number;
+  errors: number;
+  total: number;
+}
+
+export async function upsertProperties(properties: NormalizedProperty[]): Promise<UpsertResult> {
+  const result: UpsertResult = { created: 0, updated: 0, errors: 0, total: properties.length };
+
+  log.info(`Upserting ${properties.length} properties...`);
+
+  for (const prop of properties) {
+    try {
+      const existing = await prisma.property.findUnique({
+        where: { canonicalId: prop.canonicalId },
+        include: { sourceListings: true },
+      });
+
+      if (existing) {
+        await prisma.property.update({
+          where: { canonicalId: prop.canonicalId },
+          data: {
+            title: prop.title || existing.title,
+            titleZh: prop.titleZh || existing.titleZh,
+            description: prop.description || existing.description,
+            descriptionZh: prop.descriptionZh || existing.descriptionZh,
+            district: prop.district || existing.district,
+            address: prop.address || existing.address,
+            propertyType: prop.propertyType || existing.propertyType,
+            saleableArea: prop.saleableArea ?? existing.saleableArea,
+            grossArea: prop.grossArea ?? existing.grossArea,
+            monthlyRent: prop.monthlyRent ?? existing.monthlyRent,
+            psfRent: prop.psfRent ?? existing.psfRent,
+            managementFee: prop.managementFee ?? existing.managementFee,
+            price: prop.price ?? existing.price,
+            floor: prop.floor || existing.floor,
+            images: prop.images.length > 0 ? prop.images : existing.images,
+            floorPlanUrl: prop.floorPlanUrl || existing.floorPlanUrl,
+            latitude: prop.latitude ?? existing.latitude,
+            longitude: prop.longitude ?? existing.longitude,
+            features: toJsonValue(prop.features),
+            status: "active",
+          },
+        });
+
+        const sourceExists = existing.sourceListings.some((sl) => sl.source === prop.source);
+        if (!sourceExists) {
+          await prisma.sourceListing.create({
+            data: {
+              propertyId: existing.id,
+              source: prop.source,
+              sourceUrl: prop.sourceUrl,
+              rawData: toJsonValue(prop.rawData) ?? {},
+              agentName: prop.agentName,
+              agentContact: prop.agentContact,
+              scrapedAt: new Date(),
+            },
+          });
+        } else {
+          await prisma.sourceListing.updateMany({
+            where: { propertyId: existing.id, source: prop.source },
+            data: {
+              sourceUrl: prop.sourceUrl,
+              rawData: toJsonValue(prop.rawData) ?? {},
+              agentName: prop.agentName,
+              agentContact: prop.agentContact,
+              scrapedAt: new Date(),
+            },
+          });
+        }
+
+        result.updated++;
+      } else {
+        const property = await prisma.property.create({
+          data: {
+            canonicalId: prop.canonicalId,
+            title: prop.title,
+            titleZh: prop.titleZh,
+            description: prop.description,
+            descriptionZh: prop.descriptionZh,
+            district: prop.district,
+            address: prop.address,
+            propertyType: prop.propertyType,
+            saleableArea: prop.saleableArea,
+            grossArea: prop.grossArea,
+            monthlyRent: prop.monthlyRent,
+            psfRent: prop.psfRent,
+            managementFee: prop.managementFee,
+            price: prop.price,
+            floor: prop.floor,
+            images: prop.images,
+            floorPlanUrl: prop.floorPlanUrl,
+            latitude: prop.latitude,
+            longitude: prop.longitude,
+            features: toJsonValue(prop.features),
+            verificationScore: 0,
+            status: "active",
+          },
+        });
+
+        await prisma.sourceListing.create({
+          data: {
+            propertyId: property.id,
+            source: prop.source,
+            sourceUrl: prop.sourceUrl,
+            rawData: toJsonValue(prop.rawData) ?? {},
+            agentName: prop.agentName,
+            agentContact: prop.agentContact,
+            scrapedAt: new Date(),
+          },
+        });
+
+        result.created++;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`Failed to upsert ${prop.canonicalId}: ${msg}`);
+      result.errors++;
+    }
+  }
+
+  log.info(`Upsert complete: ${result.created} created, ${result.updated} updated, ${result.errors} errors`);
+  return result;
+}
+
+export async function markStaleListings(maxAgeDays: number = 30): Promise<number> {
+  const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+
+  const result = await prisma.property.updateMany({
+    where: {
+      status: "active",
+      updatedAt: { lt: cutoff },
+    },
+    data: { status: "stale" },
+  });
+
+  if (result.count > 0) {
+    log.info(`Marked ${result.count} properties as stale (not updated in ${maxAgeDays} days)`);
+  }
+
+  return result.count;
+}
+
+export async function getScraperStats(): Promise<{
+  totalProperties: number;
+  activeProperties: number;
+  bySource: Record<string, number>;
+  byType: Record<string, number>;
+  byDistrict: Record<string, number>;
+}> {
+  const [total, active, sourceListings, properties] = await Promise.all([
+    prisma.property.count(),
+    prisma.property.count({ where: { status: "active" } }),
+    prisma.sourceListing.groupBy({ by: ["source"], _count: true }),
+    prisma.property.groupBy({ by: ["propertyType"], _count: true }),
+  ]);
+
+  const districtGroups = await prisma.property.groupBy({ by: ["district"], _count: true });
+
+  return {
+    totalProperties: total,
+    activeProperties: active,
+    bySource: Object.fromEntries(sourceListings.map((s) => [s.source, s._count])),
+    byType: Object.fromEntries(properties.map((p) => [p.propertyType, p._count])),
+    byDistrict: Object.fromEntries(districtGroups.map((d) => [d.district, d._count])),
+  };
+}
+
+export async function disconnect(): Promise<void> {
+  await prisma.$disconnect();
+}
